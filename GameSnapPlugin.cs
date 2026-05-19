@@ -13,7 +13,7 @@ namespace GameSnapPlugin
     {
         public override Guid Id { get; } = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
-        public new IPlayniteAPI PlayniteApi { get; }
+        public IPlayniteAPI PlayniteApi => base.PlayniteApi;
 
         private GameSnapSettings  _settings  = new GameSnapSettings();
         private GameSnapLogger?   _logger;
@@ -23,7 +23,6 @@ namespace GameSnapPlugin
 
         public GameSnapPlugin(IPlayniteAPI api) : base(api)
         {
-            PlayniteApi = api;
             Properties  = new GenericPluginProperties { HasSettings = true };
         }
 
@@ -98,7 +97,7 @@ namespace GameSnapPlugin
             _watcher   = new WatcherService(settings, _organizer, _logger);
         }
 
-        public string GetPluginUserDataPath()
+        public new string GetPluginUserDataPath()
             => Path.Combine(PlayniteApi.Paths.ExtensionsDataPath, Id.ToString());
 
         public override IEnumerable<GameMenuItem> GetGameMenuItems(GetGameMenuItemsArgs args)
