@@ -1,0 +1,44 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Atualizar versão no extension.yaml
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          (Get-Content extension.yaml) -replace '^Version:.*', "Version: $version" |
+          Set-Content extension.yaml
+
+      - name: Compilar projeto
+        run: dotnet build GameSnapPlugin.csproj -c Release
+
+      - name: Criar o .pext
+        id: pext
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          $pextName = "GameSnap-$version.pext"
+
+          Compress-Archive -Force -Path @(
+            "bin\Release\net48\GameSnapPlugin.dll",
+            "extension.yaml",
+            "icon.png"
+          ) -DestinationPath "tmp.zip"
+
+          Rename-Item -Path "tmp.zip" -NewName $pextName
+          echo "PEXT_NAME=$pextName" >> $env:GITHUB_OUTPUT
+
+      - name: Publicar Release no GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.pext.outputs.PEXT_NAME }}
+          generate_release_notes: true

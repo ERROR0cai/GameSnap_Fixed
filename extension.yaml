@@ -1,0 +1,9 @@
+Id: GameSnap_TokamiGankei
+Name: GameSnap
+Author: TokamiGankei
+Version: 1.0.0
+Module: GameSnapPlugin.dll
+Type: GenericPlugin
+Links:
+  - Name: GitHub
+    Url: https://github.com/TokamiGankei/GameSnap
