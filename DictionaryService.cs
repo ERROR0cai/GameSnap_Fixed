@@ -79,7 +79,6 @@ namespace GameSnapPlugin
             var newLines  = new List<string>();
             bool inBlock  = false;
             bool blockFound   = false;
-            bool inserted = false;
             string? currentGame = null;
 
             for (int i = 0; i < lines.Count; i++)
@@ -115,7 +114,6 @@ namespace GameSnapPlugin
 
                         // Continua do ponto correto
                         i = j - 1;
-                        inserted = true;
                     }
                 }
             }

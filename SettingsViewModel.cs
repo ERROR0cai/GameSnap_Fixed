@@ -31,7 +31,7 @@ namespace GameSnapPlugin
             set
             {
                 _settings.ImageExtensions = new List<string>(
-                    value.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    value.Split(new char[]{','}, StringSplitOptions.RemoveEmptyEntries)
                          .Select(s => s.Trim().ToLowerInvariant())
                          .Where(s => s.StartsWith(".")));
                 OnPropertyChanged();
@@ -44,7 +44,7 @@ namespace GameSnapPlugin
             set
             {
                 _settings.VideoExtensions = new List<string>(
-                    value.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    value.Split(new char[]{','}, StringSplitOptions.RemoveEmptyEntries)
                          .Select(s => s.Trim().ToLowerInvariant())
                          .Where(s => s.StartsWith(".")));
                 OnPropertyChanged();

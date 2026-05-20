@@ -104,7 +104,7 @@ namespace GameSnapPlugin
                 {
                     var normWin = DictionaryService.Normalize(win);
                     bool blocked = _settings.WindowBlacklist.Any(b =>
-                        normWin.Contains(b, StringComparison.OrdinalIgnoreCase));
+                        normWin.IndexOf(b, StringComparison.OrdinalIgnoreCase) >= 0);
 
                     if (!blocked)
                     {
@@ -155,7 +155,7 @@ namespace GameSnapPlugin
                 File.Move(filePath, destPath);
                 _processed.Add(filePath);
 
-                counts[match.NameOriginal] = counts.GetValueOrDefault(match.NameOriginal) + 1;
+                counts[match.NameOriginal] = (counts.ContainsKey(match.NameOriginal) ? counts[match.NameOriginal] : 0) + 1;
                 _logger.Write(LogType.Move, $"File: {fileName}\nGame: {game}\nMethod: {method}");
             }
             catch (Exception ex)
