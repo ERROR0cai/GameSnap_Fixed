@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="520" d:DesignWidth="600">
+             d:DesignHeight="700" d:DesignWidth="620">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
         <StackPanel>
@@ -26,7 +26,12 @@
                         Command="{Binding BrowseSourceCommand}"/>
             </Grid>
 
-            <Grid Margin="0,0,0,16">
+            <TextBlock Text="Additional source folders (one per line):" Margin="0,0,0,4"/>
+            <TextBox Text="{Binding AdditionalSourcesText, UpdateSourceTrigger=PropertyChanged}"
+                     Height="60" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                     Margin="0,0,0,8"/>
+
+            <Grid Margin="0,0,0,8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -40,39 +45,96 @@
                         Command="{Binding BrowseDestinationCommand}"/>
             </Grid>
 
-            <Separator Margin="0,0,0,16"/>
+            <Separator Margin="0,8,0,12"/>
 
             <!-- Detection -->
             <TextBlock Text="Detection" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
 
             <CheckBox Content="Use Playnite game detection (recommended)"
                       IsChecked="{Binding Settings.UsePlayniteDetection}"
-                      Margin="0,0,0,8"/>
+                      Margin="0,0,0,6"/>
 
             <CheckBox Content="Use active window fallback"
                       IsChecked="{Binding Settings.UseWindowFallback}"
-                      Margin="0,0,0,8"/>
+                      Margin="0,0,0,6"/>
 
-            <CheckBox Content="Auto-create game folders when a game starts (disabled by default)"
+            <CheckBox Content="Auto-create game folders when a game starts"
                       IsChecked="{Binding Settings.AutoCreateFolders}"
                       Margin="0,0,0,4"/>
-            <TextBlock Text="  Creates a subfolder in the destination using the game name from Playnite."
-                       Foreground="Gray" FontSize="11" Margin="20,0,0,16"/>
+            <TextBlock Text="  Creates a subfolder using the game name from Playnite (disabled by default)."
+                       Foreground="Gray" FontSize="11" Margin="20,0,0,12"/>
 
-            <Separator Margin="0,0,0,16"/>
+            <Separator Margin="0,4,0,12"/>
+
+            <!-- Unmatched -->
+            <TextBlock Text="Unmatched Files" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
+
+            <CheckBox Content="Move unmatched screenshots to a separate folder"
+                      IsChecked="{Binding Settings.MoveUnmatchedToFolder}"
+                      Margin="0,0,0,6"/>
+
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <TextBlock Text="Folder name:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBox Width="160"
+                         Text="{Binding Settings.UnmatchedFolderName, UpdateSourceTrigger=PropertyChanged}"/>
+            </StackPanel>
+
+            <Separator Margin="0,4,0,12"/>
+
+            <!-- Notifications -->
+            <TextBlock Text="Notifications" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
+
+            <CheckBox Content="Show Playnite notification when screenshots are organized"
+                      IsChecked="{Binding Settings.ShowNotifications}"
+                      Margin="0,0,0,12"/>
+
+            <Separator Margin="0,4,0,12"/>
+
+            <!-- Rename -->
+            <TextBlock Text="Rename Pattern" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
+
+            <TextBox Text="{Binding Settings.RenamePattern, UpdateSourceTrigger=PropertyChanged}"
+                     Margin="0,0,0,4"/>
+            <TextBlock Foreground="Gray" FontSize="11" Margin="0,0,0,12"
+                       Text="Tokens: {game} {date} {time} {datetime} {original}&#x0a;Example: {game}_{date}_{time} → EldenRing_2026-05-20_14_30_00.png"/>
+
+            <Separator Margin="0,4,0,12"/>
+
+            <!-- Backup -->
+            <TextBlock Text="Backup" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
+
+            <CheckBox Content="Enable automatic backup (disabled by default)"
+                      IsChecked="{Binding Settings.EnableBackup}"
+                      Margin="0,0,0,6"/>
+
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Backup folder:" Margin="0,0,0,4"/>
+                    <TextBox Text="{Binding Settings.BackupFolder, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+                <Button Grid.Column="1" Content="Browse" VerticalAlignment="Bottom"
+                        Margin="8,0,0,0" Padding="10,4"
+                        Command="{Binding BrowseBackupCommand}"/>
+            </Grid>
+
+            <Separator Margin="0,4,0,12"/>
 
             <!-- Polling -->
             <TextBlock Text="Polling interval (seconds):" Margin="0,0,0,4"/>
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                 <TextBox Width="60"
                          Text="{Binding Settings.PollingIntervalSeconds, UpdateSourceTrigger=PropertyChanged}"/>
-                <TextBlock Text="  (backup scan interval in addition to file watcher)"
+                <TextBlock Text="  (backup scan in addition to real-time file watcher)"
                            VerticalAlignment="Center" Foreground="Gray"/>
             </StackPanel>
 
-            <Separator Margin="0,0,0,16"/>
+            <Separator Margin="0,4,0,12"/>
 
-            <!-- Files -->
+            <!-- Extensions -->
             <TextBlock Text="File Extensions" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
 
             <TextBlock Text="Image extensions (comma separated):" Margin="0,0,0,4"/>
@@ -80,10 +142,10 @@
                      Text="{Binding ImageExtensionsText, UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBlock Text="Video extensions (comma separated):" Margin="0,0,0,4"/>
-            <TextBox Margin="0,0,0,16"
+            <TextBox Margin="0,0,0,12"
                      Text="{Binding VideoExtensionsText, UpdateSourceTrigger=PropertyChanged}"/>
 
-            <Separator Margin="0,0,0,16"/>
+            <Separator Margin="0,4,0,12"/>
 
             <!-- Tools -->
             <TextBlock Text="Tools" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>

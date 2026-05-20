@@ -1,11 +1,11 @@
 using Playnite.SDK;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
-using System;
 
 namespace GameSnapPlugin
 {
@@ -15,8 +15,8 @@ namespace GameSnapPlugin
         protected void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-        private readonly GameSnapPlugin   _plugin;
-        private          GameSnapSettings _settings;
+        private readonly GameSnapPlugin    _plugin;
+        private          GameSnapSettings  _settings;
         private          GameSnapSettings? _editingClone;
 
         public GameSnapSettings Settings
@@ -25,13 +25,14 @@ namespace GameSnapPlugin
             set { _settings = value; OnPropertyChanged(); }
         }
 
+        // Extensions text bindings
         public string ImageExtensionsText
         {
             get => string.Join(", ", _settings.ImageExtensions);
             set
             {
                 _settings.ImageExtensions = new List<string>(
-                    value.Split(new char[]{','}, StringSplitOptions.RemoveEmptyEntries)
+                    value.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                          .Select(s => s.Trim().ToLowerInvariant())
                          .Where(s => s.StartsWith(".")));
                 OnPropertyChanged();
@@ -44,15 +45,38 @@ namespace GameSnapPlugin
             set
             {
                 _settings.VideoExtensions = new List<string>(
-                    value.Split(new char[]{','}, StringSplitOptions.RemoveEmptyEntries)
+                    value.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                          .Select(s => s.Trim().ToLowerInvariant())
                          .Where(s => s.StartsWith(".")));
                 OnPropertyChanged();
             }
         }
 
+        // Additional sources text binding (one per line)
+        public string AdditionalSourcesText
+        {
+            get => string.Join(Environment.NewLine, _settings.AdditionalSourceFolders);
+            set
+            {
+                _settings.AdditionalSourceFolders = new List<string>(
+                    value.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                         .Select(s => s.Trim())
+                         .Where(s => !string.IsNullOrEmpty(s)));
+                OnPropertyChanged();
+            }
+        }
+
+        // Backup folder binding
+        public string BackupFolder
+        {
+            get => _settings.BackupFolder;
+            set { _settings.BackupFolder = value; OnPropertyChanged(); }
+        }
+
+        // Commands
         public ICommand BrowseSourceCommand      { get; }
         public ICommand BrowseDestinationCommand { get; }
+        public ICommand BrowseBackupCommand      { get; }
         public ICommand OpenDictionaryCommand    { get; }
         public ICommand OpenLogCommand           { get; }
 
@@ -63,6 +87,7 @@ namespace GameSnapPlugin
 
             BrowseSourceCommand      = new RelayCommand(BrowseSource);
             BrowseDestinationCommand = new RelayCommand(BrowseDestination);
+            BrowseBackupCommand      = new RelayCommand(BrowseBackup);
             OpenDictionaryCommand    = new RelayCommand(OpenDictionary);
             OpenLogCommand           = new RelayCommand(OpenLog);
         }
@@ -106,6 +131,12 @@ namespace GameSnapPlugin
             if (path != null) { _settings.DestinationBase = path; OnPropertyChanged(nameof(Settings)); }
         }
 
+        private void BrowseBackup()
+        {
+            var path = _plugin.PlayniteApi.Dialogs.SelectFolder();
+            if (path != null) { _settings.BackupFolder = path; OnPropertyChanged(nameof(Settings)); }
+        }
+
         private void OpenDictionary()
         {
             var path = Path.Combine(_plugin.GetPluginUserDataPath(), "dictionary.txt");
@@ -125,14 +156,22 @@ namespace GameSnapPlugin
 
         private static GameSnapSettings CloneSettings(GameSnapSettings src) => new GameSnapSettings
         {
-            SourceFolder           = src.SourceFolder,
-            DestinationBase        = src.DestinationBase,
-            PollingIntervalSeconds = src.PollingIntervalSeconds,
-            UsePlayniteDetection   = src.UsePlayniteDetection,
-            UseWindowFallback      = src.UseWindowFallback,
-            ImageExtensions        = new List<string>(src.ImageExtensions),
-            VideoExtensions        = new List<string>(src.VideoExtensions),
-            WindowBlacklist        = new List<string>(src.WindowBlacklist),
+            SourceFolder              = src.SourceFolder,
+            AdditionalSourceFolders   = new List<string>(src.AdditionalSourceFolders),
+            DestinationBase           = src.DestinationBase,
+            PollingIntervalSeconds    = src.PollingIntervalSeconds,
+            UsePlayniteDetection      = src.UsePlayniteDetection,
+            UseWindowFallback         = src.UseWindowFallback,
+            AutoCreateFolders         = src.AutoCreateFolders,
+            MoveUnmatchedToFolder     = src.MoveUnmatchedToFolder,
+            UnmatchedFolderName       = src.UnmatchedFolderName,
+            ShowNotifications         = src.ShowNotifications,
+            RenamePattern             = src.RenamePattern,
+            EnableBackup              = src.EnableBackup,
+            BackupFolder              = src.BackupFolder,
+            ImageExtensions           = new List<string>(src.ImageExtensions),
+            VideoExtensions           = new List<string>(src.VideoExtensions),
+            WindowBlacklist           = new List<string>(src.WindowBlacklist),
         };
     }
 

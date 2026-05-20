@@ -24,12 +24,9 @@ namespace GameSnapPlugin
             Properties = new GenericPluginProperties { HasSettings = true };
         }
 
-        // ──────────────────────────────────────────────
-        // Lifecycle
-        // ──────────────────────────────────────────────
-
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
+            _settings = LoadPluginSettings<GameSnapSettings>() ?? new GameSnapSettings();
             InitServices(_settings);
             _watcher?.Start();
         }
@@ -61,14 +58,11 @@ namespace GameSnapPlugin
             if (string.IsNullOrWhiteSpace(_settings.DestinationBase)) return;
             if (!Directory.Exists(_settings.DestinationBase)) return;
 
-            // Sanitize game name for use as folder name
-            var invalid = Path.GetInvalidFileNameChars();
+            var invalid    = Path.GetInvalidFileNameChars();
             var folderName = string.Concat(gameName.Split(invalid)).Trim();
-
             if (string.IsNullOrWhiteSpace(folderName)) return;
 
             var folderPath = Path.Combine(_settings.DestinationBase, folderName);
-
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);
@@ -118,7 +112,19 @@ namespace GameSnapPlugin
             _logger    = new GameSnapLogger(dataPath);
             _dict      = new DictionaryService(dataPath);
             _organizer = new OrganizerService(settings, _dict, _logger);
-            _watcher   = new WatcherService(settings, _organizer, _logger);
+
+            // Notificação toast quando arquivos são movidos
+            _organizer.OnFileMoved = (title, message) =>
+            {
+                if (settings.ShowNotifications)
+                    PlayniteApi.Notifications.Add(
+                        new NotificationMessage(
+                            Guid.NewGuid().ToString(),
+                            message,
+                            NotificationType.Info));
+            };
+
+            _watcher = new WatcherService(settings, _organizer, _logger);
         }
 
         public override IEnumerable<GameMenuItem> GetGameMenuItems(GetGameMenuItemsArgs args)

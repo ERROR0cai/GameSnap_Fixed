@@ -14,6 +14,9 @@ namespace GameSnapPlugin
         private readonly DictionaryService  _dictionary;
         private readonly GameSnapLogger     _logger;
 
+        // Callback para notificações (injetado pelo plugin principal)
+        public Action<string, string>? OnFileMoved { get; set; }
+
         // Jogo atual informado pelo Playnite
         private string? _currentGame;
 
@@ -34,22 +37,40 @@ namespace GameSnapPlugin
         // ──────────────────────────────────────────────
         public void Organize()
         {
-            if (!Directory.Exists(_settings.SourceFolder))  return;
+            var allSources = new List<string>();
+
+            if (!string.IsNullOrEmpty(_settings.SourceFolder))
+                allSources.Add(_settings.SourceFolder);
+
+            allSources.AddRange(_settings.AdditionalSourceFolders
+                .Where(f => !string.IsNullOrEmpty(f) && Directory.Exists(f)));
+
+            if (allSources.Count == 0) return;
             if (!Directory.Exists(_settings.DestinationBase)) return;
 
             var dict    = _dictionary.Load();
             var folders = LoadFolders();
             var counts  = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var file in Directory.GetFiles(_settings.SourceFolder))
+            foreach (var source in allSources)
             {
-                TryOrganizeFile(file, dict, folders, counts);
+                if (!Directory.Exists(source)) continue;
+                foreach (var file in Directory.GetFiles(source))
+                {
+                    TryOrganizeFile(file, dict, folders, counts);
+                }
             }
 
             if (counts.Count > 0)
             {
                 var summary = string.Join(" | ", counts.Select(kv => $"{kv.Key} ({kv.Value})"));
-                _logger.Info(summary);
+                _logger.Info($"Organized: {summary}");
+
+                // Dispara notificação agregada
+                OnFileMoved?.Invoke(
+                    "GameSnap",
+                    $"Organized {counts.Values.Sum()} screenshot(s): {summary}"
+                );
             }
         }
 
@@ -70,7 +91,6 @@ namespace GameSnapPlugin
 
             if (!isImage && !isVideo) return;
 
-            // Pequena pausa para garantir que o arquivo foi completamente escrito
             System.Threading.Thread.Sleep(1000);
 
             var fileName = Path.GetFileName(filePath);
@@ -80,23 +100,23 @@ namespace GameSnapPlugin
             string? game   = null;
             string  method = "UNKNOWN";
 
-            // 1. Dicionário (alias aprendido ou manual)
+            // 1. Dicionário
             if (dict.TryGetValue(normPfx, out var fromDict))
             {
                 game   = fromDict;
                 method = "DICTIONARY";
             }
 
-            // 2. Playnite (jogo em execução)
+            // 2. Playnite
             if (game == null && _settings.UsePlayniteDetection && !string.IsNullOrEmpty(_currentGame))
             {
                 game   = _currentGame;
                 method = "PLAYNITE";
                 _dictionary.SaveAlias(prefix, _currentGame);
-                _logger.Write(LogType.Learn, $"Prefix: {prefix}\nGame: {_currentGame}\nSource: Playnite");
+                _logger.Write(LogType.Learn, $"Prefix: {prefix}\nGame: {_currentGame}");
             }
 
-            // 3. Fallback por janela ativa
+            // 3. Janela ativa
             if (game == null && _settings.UseWindowFallback)
             {
                 var win = GetActiveWindowTitle();
@@ -115,13 +135,15 @@ namespace GameSnapPlugin
                 }
             }
 
+            // Sem match
             if (game == null)
             {
                 _logger.Write(LogType.Error, $"File: {fileName}\nReason: No detection");
+                TryMoveToUnmatched(filePath, ext);
                 return;
             }
 
-            // Encontra a pasta de destino
+            // Encontra pasta de destino
             var normGame = DictionaryService.Normalize(game);
             var match = folders
                 .Where(f => f.NameNorm.Contains(normGame) || normGame.Contains(f.NameNorm))
@@ -131,6 +153,7 @@ namespace GameSnapPlugin
             if (match == null)
             {
                 _logger.Write(LogType.Error, $"File: {fileName}\nGame: {game}\nNo folder found");
+                TryMoveToUnmatched(filePath, ext);
                 return;
             }
 
@@ -139,29 +162,115 @@ namespace GameSnapPlugin
                 ? EnsureDir(Path.Combine(match.Path, "Videos"))
                 : match.Path;
 
-            var date     = GetBestDate(filePath).ToString("yyyy-MM-dd HH_mm_ss");
-            var destPath = Path.Combine(destDir, $"{match.NameOriginal}_{date}{ext}");
+            var date     = GetBestDate(filePath);
+            var destName = BuildDestName(match.NameOriginal, date, Path.GetFileNameWithoutExtension(fileName), ext);
+            var destPath = Path.Combine(destDir, destName);
 
-            // Evita colisão de nomes
+            // Evita colisão
             int i = 1;
             while (File.Exists(destPath))
             {
-                destPath = Path.Combine(destDir, $"{match.NameOriginal}_{date}_{i}{ext}");
+                var nameNoExt = Path.GetFileNameWithoutExtension(destName);
+                destPath = Path.Combine(destDir, $"{nameNoExt}_{i}{ext}");
                 i++;
             }
 
             try
             {
                 File.Move(filePath, destPath);
+
+                // Backup opcional
+                if (_settings.EnableBackup && !string.IsNullOrEmpty(_settings.BackupFolder))
+                    TryBackup(destPath, match.NameOriginal, isVideo);
+
                 _processed.Add(filePath);
 
-                counts[match.NameOriginal] = (counts.ContainsKey(match.NameOriginal) ? counts[match.NameOriginal] : 0) + 1;
+                int current = counts.ContainsKey(match.NameOriginal) ? counts[match.NameOriginal] : 0;
+                counts[match.NameOriginal] = current + 1;
+
                 _logger.Write(LogType.Move, $"File: {fileName}\nGame: {game}\nMethod: {method}");
             }
             catch (Exception ex)
             {
                 _logger.Write(LogType.Error, $"File: {fileName}\nMove failed: {ex.Message}");
             }
+        }
+
+        // ──────────────────────────────────────────────
+        // Pasta Unmatched
+        // ──────────────────────────────────────────────
+        private void TryMoveToUnmatched(string filePath, string ext)
+        {
+            if (!_settings.MoveUnmatchedToFolder) return;
+            if (string.IsNullOrWhiteSpace(_settings.DestinationBase)) return;
+
+            try
+            {
+                var unmatchedDir = EnsureDir(
+                    Path.Combine(_settings.DestinationBase, _settings.UnmatchedFolderName));
+
+                var destPath = Path.Combine(unmatchedDir, Path.GetFileName(filePath));
+                int i = 1;
+                while (File.Exists(destPath))
+                {
+                    var nameNoExt = Path.GetFileNameWithoutExtension(filePath);
+                    destPath = Path.Combine(unmatchedDir, $"{nameNoExt}_{i}{ext}");
+                    i++;
+                }
+
+                File.Move(filePath, destPath);
+                _processed.Add(filePath);
+                _logger.Write(LogType.Info, $"Moved to unmatched: {Path.GetFileName(filePath)}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Write(LogType.Error, $"Unmatched move failed: {ex.Message}");
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        // Backup
+        // ──────────────────────────────────────────────
+        private void TryBackup(string sourcePath, string gameName, bool isVideo)
+        {
+            try
+            {
+                var backupGame = EnsureDir(Path.Combine(_settings.BackupFolder, gameName));
+                var backupDir  = isVideo ? EnsureDir(Path.Combine(backupGame, "Videos")) : backupGame;
+                var destPath   = Path.Combine(backupDir, Path.GetFileName(sourcePath));
+
+                if (!File.Exists(destPath))
+                    File.Copy(sourcePath, destPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.Write(LogType.Error, $"Backup failed: {ex.Message}");
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        // Renomeação customizável
+        // ──────────────────────────────────────────────
+        private string BuildDestName(string gameName, DateTime date, string originalName, string ext)
+        {
+            var pattern = string.IsNullOrWhiteSpace(_settings.RenamePattern)
+                ? "{game}_{date}_{time}"
+                : _settings.RenamePattern;
+
+            var result = pattern
+                .Replace("{game}",     SanitizeFileName(gameName))
+                .Replace("{date}",     date.ToString("yyyy-MM-dd"))
+                .Replace("{time}",     date.ToString("HH_mm_ss"))
+                .Replace("{datetime}", date.ToString("yyyy-MM-dd_HH_mm_ss"))
+                .Replace("{original}", SanitizeFileName(originalName));
+
+            return result + ext;
+        }
+
+        private static string SanitizeFileName(string name)
+        {
+            var invalid = Path.GetInvalidFileNameChars();
+            return string.Concat(name.Split(invalid)).Trim();
         }
 
         // ──────────────────────────────────────────────
@@ -218,7 +327,6 @@ namespace GameSnapPlugin
             return path;
         }
 
-        // Win32 — janela ativa
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
