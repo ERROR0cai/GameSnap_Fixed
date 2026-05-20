@@ -50,6 +50,9 @@ namespace GameSnapPlugin
         // Caminho do Steam (detectado automaticamente se vazio)
         public string SteamPath { get; set; } = "";
 
+        // Integração com Screenshots Utilities Local Provider (desativado por padrão)
+        public bool EnableLocalProviderIntegration { get; set; } = false;
+
         // Extensões de imagem monitoradas
         public List<string> ImageExtensions { get; set; } = new List<string>
         {

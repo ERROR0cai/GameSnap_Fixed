@@ -18,7 +18,8 @@ namespace GameSnapPlugin
         private DictionaryService? _dict;
         private OrganizerService?  _organizer;
         private WatcherService?    _watcher;
-        private SteamService?      _steam;
+        private SteamService?           _steam;
+        private LocalProviderService?   _localProvider;
 
         public GameSnapPlugin(IPlayniteAPI api) : base(api)
         {
@@ -138,6 +139,16 @@ namespace GameSnapPlugin
             };
 
             _watcher = new WatcherService(settings, _organizer, _logger);
+
+            // Local Provider integration
+            _localProvider = new LocalProviderService(PlayniteApi, _logger);
+            if (settings.EnableLocalProviderIntegration && !string.IsNullOrEmpty(settings.DestinationBase))
+            {
+                if (_localProvider.IsInstalled())
+                    _localProvider.RegisterDestinationFolder(settings.DestinationBase);
+                else
+                    _logger.Info("Local Provider: not installed, skipping registration.");
+            }
         }
 
         public override IEnumerable<GameMenuItem> GetGameMenuItems(GetGameMenuItemsArgs args)
