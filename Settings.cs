@@ -19,6 +19,9 @@ namespace GameSnapPlugin
         // Usar fallback por janela ativa
         public bool UseWindowFallback { get; set; } = true;
 
+        // Criar pasta automaticamente quando um jogo é iniciado (desativado por padrão)
+        public bool AutoCreateFolders { get; set; } = false;
+
         // Extensões de imagem monitoradas
         public List<string> ImageExtensions { get; set; } = new List<string>
         {

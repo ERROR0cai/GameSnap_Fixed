@@ -6,10 +6,10 @@ A [Playnite](https://playnite.link/) plugin that **automatically organizes your 
 
 ## Screenshots
 
-![Settings](screenshots/01_settings.png)
-![Dictionary](screenshots/02_dictionary.png)
-![Log](screenshots/03_log.png)
-![Organized Folders](screenshots/04_folders.png)
+![Right Click Menu](screenshots/01_Right_Click.png)
+![Settings](screenshots/02_Settings.png)
+![Organized Folders](screenshots/03_Folders.png)
+![Screenshots of Games](screenshots/04_Screenshots_of_games.png)
 
 ---
 
@@ -75,6 +75,7 @@ In Playnite, go to **Add-ons → GameSnap → Settings** and fill in:
 | Use Playnite detection | Recommended — identifies the game while it's running |
 | Use active window fallback | Secondary detection when no game is active in Playnite |
 | Polling interval | Backup scan in seconds (in addition to the real-time file watcher) |
+| Auto-create game folders | Automatically creates a subfolder when a new game is played (disabled by default) |
 
 ### Step 3 — Create your game folders
 
@@ -89,6 +90,8 @@ Captures\
 ```
 
 GameSnap will match screenshots to these folders automatically.
+
+> **Tip:** Enable **Auto-create game folders** in Settings to have GameSnap create these folders automatically whenever you start a game for the first time. This replaces the need for a separate plugin like ScreenshotsVisualizer just for folder creation.
 
 ---
 
@@ -140,7 +143,8 @@ GameSnap **learns automatically** — when Playnite detection identifies a game,
 → Move the file manually and add the correct alias to `dictionary.txt`.
 
 **A game has no folder yet**  
-→ Create the subfolder inside the destination base. The next scan will pick it up.
+→ Create the subfolder inside the destination base. The next scan will pick it up.  
+→ Or enable **Auto-create game folders** in Settings so GameSnap handles this automatically.
 
 **ShareX is saving files with timestamps only, no game name**  
 → In ShareX, set the name pattern to `%t %y-%mo-%d_%h-%mi-%s` so the window title is included.

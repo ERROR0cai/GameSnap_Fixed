@@ -43,11 +43,37 @@ namespace GameSnapPlugin
         public override void OnGameStarted(OnGameStartedEventArgs args)
         {
             _organizer?.SetCurrentGame(args.Game.Name);
+            TryAutoCreateFolder(args.Game.Name);
         }
 
         public override void OnGameStopped(OnGameStoppedEventArgs args)
         {
             _organizer?.SetCurrentGame(null);
+        }
+
+        // ──────────────────────────────────────────────
+        // Auto-create folder
+        // ──────────────────────────────────────────────
+
+        private void TryAutoCreateFolder(string gameName)
+        {
+            if (!_settings.AutoCreateFolders) return;
+            if (string.IsNullOrWhiteSpace(_settings.DestinationBase)) return;
+            if (!Directory.Exists(_settings.DestinationBase)) return;
+
+            // Sanitize game name for use as folder name
+            var invalid = Path.GetInvalidFileNameChars();
+            var folderName = string.Concat(gameName.Split(invalid)).Trim();
+
+            if (string.IsNullOrWhiteSpace(folderName)) return;
+
+            var folderPath = Path.Combine(_settings.DestinationBase, folderName);
+
+            if (!Directory.Exists(folderPath))
+            {
+                Directory.CreateDirectory(folderPath);
+                _logger?.Info($"Auto-created folder: {folderPath}");
+            }
         }
 
         // ──────────────────────────────────────────────

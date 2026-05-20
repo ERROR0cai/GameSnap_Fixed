@@ -51,7 +51,13 @@
 
             <CheckBox Content="Use active window fallback"
                       IsChecked="{Binding Settings.UseWindowFallback}"
-                      Margin="0,0,0,16"/>
+                      Margin="0,0,0,8"/>
+
+            <CheckBox Content="Auto-create game folders when a game starts (disabled by default)"
+                      IsChecked="{Binding Settings.AutoCreateFolders}"
+                      Margin="0,0,0,4"/>
+            <TextBlock Text="  Creates a subfolder in the destination using the game name from Playnite."
+                       Foreground="Gray" FontSize="11" Margin="20,0,0,16"/>
 
             <Separator Margin="0,0,0,16"/>
 
