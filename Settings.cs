@@ -44,6 +44,12 @@ namespace GameSnapPlugin
         // Pasta de backup
         public string BackupFolder { get; set; } = "";
 
+        // Suporte a screenshots do Steam (desativado por padrão)
+        public bool EnableSteamSupport { get; set; } = false;
+
+        // Caminho do Steam (detectado automaticamente se vazio)
+        public string SteamPath { get; set; } = "";
+
         // Extensões de imagem monitoradas
         public List<string> ImageExtensions { get; set; } = new List<string>
         {

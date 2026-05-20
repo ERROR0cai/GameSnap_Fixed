@@ -18,6 +18,7 @@ namespace GameSnapPlugin
         private DictionaryService? _dict;
         private OrganizerService?  _organizer;
         private WatcherService?    _watcher;
+        private SteamService?      _steam;
 
         public GameSnapPlugin(IPlayniteAPI api) : base(api)
         {
@@ -112,6 +113,18 @@ namespace GameSnapPlugin
             _logger    = new GameSnapLogger(dataPath);
             _dict      = new DictionaryService(dataPath);
             _organizer = new OrganizerService(settings, _dict, _logger);
+
+            // Steam support
+            if (settings.EnableSteamSupport)
+            {
+                _steam = new SteamService(PlayniteApi, _logger);
+                _organizer.SteamService = _steam;
+            }
+            else
+            {
+                _steam = null;
+                _organizer.SteamService = null;
+            }
 
             // Notificação toast quando arquivos são movidos
             _organizer.OnFileMoved = (title, message) =>

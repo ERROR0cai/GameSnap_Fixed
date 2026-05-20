@@ -77,6 +77,7 @@ namespace GameSnapPlugin
         public ICommand BrowseSourceCommand      { get; }
         public ICommand BrowseDestinationCommand { get; }
         public ICommand BrowseBackupCommand      { get; }
+        public ICommand BrowseSteamCommand       { get; }
         public ICommand OpenDictionaryCommand    { get; }
         public ICommand OpenLogCommand           { get; }
 
@@ -88,6 +89,7 @@ namespace GameSnapPlugin
             BrowseSourceCommand      = new RelayCommand(BrowseSource);
             BrowseDestinationCommand = new RelayCommand(BrowseDestination);
             BrowseBackupCommand      = new RelayCommand(BrowseBackup);
+            BrowseSteamCommand       = new RelayCommand(BrowseSteam);
             OpenDictionaryCommand    = new RelayCommand(OpenDictionary);
             OpenLogCommand           = new RelayCommand(OpenLog);
         }
@@ -137,6 +139,12 @@ namespace GameSnapPlugin
             if (path != null) { _settings.BackupFolder = path; OnPropertyChanged(nameof(Settings)); }
         }
 
+        private void BrowseSteam()
+        {
+            var path = _plugin.PlayniteApi.Dialogs.SelectFolder();
+            if (path != null) { _settings.SteamPath = path; OnPropertyChanged(nameof(Settings)); }
+        }
+
         private void OpenDictionary()
         {
             var path = Path.Combine(_plugin.GetPluginUserDataPath(), "dictionary.txt");
@@ -169,6 +177,8 @@ namespace GameSnapPlugin
             RenamePattern             = src.RenamePattern,
             EnableBackup              = src.EnableBackup,
             BackupFolder              = src.BackupFolder,
+            EnableSteamSupport        = src.EnableSteamSupport,
+            SteamPath                 = src.SteamPath,
             ImageExtensions           = new List<string>(src.ImageExtensions),
             VideoExtensions           = new List<string>(src.VideoExtensions),
             WindowBlacklist           = new List<string>(src.WindowBlacklist),

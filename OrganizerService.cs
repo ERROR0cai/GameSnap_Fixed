@@ -35,8 +35,15 @@ namespace GameSnapPlugin
         // ──────────────────────────────────────────────
         // Entry point — chamado pelo watcher e pelo loop
         // ──────────────────────────────────────────────
+        // Steam service reference (set by plugin)
+        public SteamService? SteamService { get; set; }
+
         public void Organize()
         {
+            // Steam screenshots
+            if (_settings.EnableSteamSupport && SteamService != null)
+                OrganizeSteam();
+
             var allSources = new List<string>();
 
             if (!string.IsNullOrEmpty(_settings.SourceFolder))
@@ -71,6 +78,95 @@ namespace GameSnapPlugin
                     "GameSnap",
                     $"Organized {counts.Values.Sum()} screenshot(s): {summary}"
                 );
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        // Steam
+        // ──────────────────────────────────────────────
+        private void OrganizeSteam()
+        {
+            if (SteamService == null) return;
+
+            var steamPath = !string.IsNullOrEmpty(_settings.SteamPath)
+                ? _settings.SteamPath
+                : SteamService.DetectSteamPath() ?? "";
+
+            if (string.IsNullOrEmpty(steamPath)) return;
+
+            var pending = SteamService.GetPendingScreenshots(steamPath);
+            if (pending.Count == 0) return;
+
+            var folders = LoadFolders();
+            var counts  = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var ss in pending)
+            {
+                if (_processed.Contains(ss.FilePath)) continue;
+
+                var gameName = SteamService.ResolveGameName(ss.AppId);
+                if (gameName == null)
+                {
+                    _logger.Write(LogType.Error,
+                        $"Steam: AppID {ss.AppId} not found in library. File: {Path.GetFileName(ss.FilePath)}");
+                    TryMoveToUnmatched(ss.FilePath, Path.GetExtension(ss.FilePath).ToLowerInvariant());
+                    continue;
+                }
+
+                var normGame = DictionaryService.Normalize(gameName);
+                var match = folders
+                    .Where(f => f.NameNorm.Contains(normGame) || normGame.Contains(f.NameNorm))
+                    .OrderByDescending(f => f.NameNorm.Length)
+                    .FirstOrDefault();
+
+                if (match == null)
+                {
+                    _logger.Write(LogType.Error,
+                        $"Steam: No folder for '{gameName}'. File: {Path.GetFileName(ss.FilePath)}");
+                    TryMoveToUnmatched(ss.FilePath, Path.GetExtension(ss.FilePath).ToLowerInvariant());
+                    continue;
+                }
+
+                var ext      = Path.GetExtension(ss.FilePath).ToLowerInvariant();
+                var date     = GetBestDate(ss.FilePath);
+                var destName = BuildDestName(match.NameOriginal, date,
+                                            Path.GetFileNameWithoutExtension(ss.FilePath), ext);
+                var destPath = Path.Combine(match.Path, destName);
+
+                int i = 1;
+                while (File.Exists(destPath))
+                {
+                    var nameNoExt = Path.GetFileNameWithoutExtension(destName);
+                    destPath = Path.Combine(match.Path, $"{nameNoExt}_{i}{ext}");
+                    i++;
+                }
+
+                try
+                {
+                    File.Move(ss.FilePath, destPath);
+
+                    if (_settings.EnableBackup && !string.IsNullOrEmpty(_settings.BackupFolder))
+                        TryBackup(destPath, match.NameOriginal, false);
+
+                    _processed.Add(ss.FilePath);
+
+                    int current = counts.ContainsKey(match.NameOriginal) ? counts[match.NameOriginal] : 0;
+                    counts[match.NameOriginal] = current + 1;
+
+                    _logger.Write(LogType.Move,
+                        $"Steam: {Path.GetFileName(ss.FilePath)} → {match.NameOriginal}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Write(LogType.Error,
+                        $"Steam move failed: {ex.Message}");
+                }
+            }
+
+            if (counts.Count > 0)
+            {
+                var summary = string.Join(" | ", counts.Select(kv => $"{kv.Key} ({kv.Value})"));
+                OnFileMoved?.Invoke("GameSnap", $"Steam: {counts.Values.Sum()} screenshot(s): {summary}");
             }
         }
 
