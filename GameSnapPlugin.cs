@@ -13,17 +13,15 @@ namespace GameSnapPlugin
     {
         public override Guid Id { get; } = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
-        public IPlayniteAPI PlayniteApi => base.PlayniteApi;
-
-        private GameSnapSettings  _settings  = new GameSnapSettings();
-        private GameSnapLogger?   _logger;
+        private GameSnapSettings   _settings  = new GameSnapSettings();
+        private GameSnapLogger?    _logger;
         private DictionaryService? _dict;
-        private OrganizerService? _organizer;
-        private WatcherService?   _watcher;
+        private OrganizerService?  _organizer;
+        private WatcherService?    _watcher;
 
         public GameSnapPlugin(IPlayniteAPI api) : base(api)
         {
-            Properties  = new GenericPluginProperties { HasSettings = true };
+            Properties = new GenericPluginProperties { HasSettings = true };
         }
 
         // ──────────────────────────────────────────────
@@ -97,14 +95,11 @@ namespace GameSnapPlugin
             _watcher   = new WatcherService(settings, _organizer, _logger);
         }
 
-        public new string GetPluginUserDataPath()
-            => Path.Combine(PlayniteApi.Paths.ExtensionsDataPath, Id.ToString());
-
         public override IEnumerable<GameMenuItem> GetGameMenuItems(GetGameMenuItemsArgs args)
         {
             yield return new GameMenuItem
             {
-                Description = "GameSnap: Organize screenshots now",
+                Description = "Organize screenshots now",
                 MenuSection = "GameSnap",
                 Action = _ => _organizer?.Organize()
             };
@@ -139,7 +134,7 @@ namespace GameSnapPlugin
                 {
                     var path = Path.Combine(GetPluginUserDataPath(), "dictionary.txt");
                     if (!File.Exists(path))
-                        File.WriteAllText(path, "# Formato:\n# [Nome do Jogo]\n# alias1\n");
+                        File.WriteAllText(path, "# Format:\n# [Game Name]\n# alias1\n");
                     System.Diagnostics.Process.Start("notepad.exe", path);
                 }
             };
