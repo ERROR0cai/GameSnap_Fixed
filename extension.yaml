@@ -4,7 +4,7 @@ Author: TokamiGankei
 Version: 1.0.0
 Module: GameSnapPlugin.dll
 Type: GenericPlugin
-Description: Automatically organizes game screenshots into per-game folders. Works with Xbox Game Bar, ShareX, and any other capture tool. No scripts, no manual setup — just install and play.
+Description: Automatically organizes game screenshots into per-game folders. Works with Xbox Game Bar, ShareX, and any other capture tool. No scripts, no manual setup  —  just install and play.
 Links:
   - Name: GitHub
     Url: https://github.com/TokamiGankei/GameSnap

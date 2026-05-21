@@ -194,6 +194,28 @@ namespace GameSnapPlugin
                     System.Diagnostics.Process.Start("notepad.exe", path);
                 }
             };
+
+            yield return new MainMenuItem
+            {
+                Description = "Review unmatched screenshots",
+                MenuSection = "@GameSnap",
+                Action = _ => OpenReviewWindow()
+            };
+        }
+        private void OpenReviewWindow()
+        {
+            if (_organizer == null || _dict == null || _logger == null)
+            {
+                PlayniteApi.Dialogs.ShowMessage("GameSnap is not fully initialized.", "GameSnap");
+                return;
+            }
+
+            var vm = new ReviewViewModel(
+                PlayniteApi, _settings, _dict, _organizer, _logger);
+
+            var window = new Views.ReviewWindow(vm);
+            vm.SetCloseAction(() => window.Close());
+            window.ShowDialog();
         }
     }
 }
