@@ -120,7 +120,7 @@
                     <Border Grid.Row="0" Background="#0f3460" Padding="10,0">
                         <TextBlock Text="Unmatched Files" Foreground="#a0b4c8"
                                    FontSize="11" FontWeight="SemiBold"
-                                   VerticalAlignment="Center" TextTransform="Uppercase"/>
+                                   VerticalAlignment="Center"/>
                     </Border>
                     <ListBox Grid.Row="1"
                              ItemsSource="{Binding UnmatchedFiles}"
@@ -180,7 +180,7 @@
                     <Border Grid.Row="0" Background="#0f3460" Padding="10,0">
                         <TextBlock Text="Assign to Game" Foreground="#a0b4c8"
                                    FontSize="11" FontWeight="SemiBold"
-                                   VerticalAlignment="Center" TextTransform="Uppercase"/>
+                                   VerticalAlignment="Center"/>
                     </Border>
 
                     <TextBox Grid.Row="1"
