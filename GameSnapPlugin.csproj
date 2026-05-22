@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="System.Runtime.Serialization" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Resource Include="icon.png" />
   </ItemGroup>
 

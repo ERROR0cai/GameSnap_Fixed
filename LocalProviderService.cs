@@ -1,5 +1,6 @@
 using Playnite.SDK;
 using System;
+using System.Runtime.Serialization;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -12,9 +13,6 @@ namespace GameSnapPlugin
     /// </summary>
     public class LocalProviderService
     {
-        // GUID do Screenshots Utilities Local Provider
-        private static readonly string LocalProviderExtensionId = "ScreenshotsUtilitiesLocalProvider_HerrKnarz";
-
         private readonly IPlayniteAPI  _playniteApi;
         private readonly GameSnapLogger _logger;
 
@@ -190,50 +188,127 @@ namespace GameSnapPlugin
     // Modelos do config.json do Local Provider
     // ──────────────────────────────────────────────
 
+    [DataContract]
     public class LocalProviderConfig
     {
+        [DataMember]
         public List<LocalProviderGameProfile> GameProfiles { get; set; } = new List<LocalProviderGameProfile>();
     }
 
+    [DataContract]
     public class LocalProviderGameProfile
     {
+        [DataMember]
         public string GameId { get; set; } = "";
+        [DataMember]
         public bool OverrideGlobalConfigs { get; set; } = false;
+        [DataMember]
         public List<LocalProviderFolderConfig> FolderConfigs { get; set; } = new List<LocalProviderFolderConfig>();
     }
 
+    [DataContract]
     public class LocalProviderFolderConfig
     {
+        [DataMember]
         public bool   Active                   { get; set; } = true;
+        [DataMember]
         public string FileMask                 { get; set; } = "*.png;*.jpg";
+        [DataMember]
         public string InvalidCharReplacement   { get; set; } = "_";
+        [DataMember]
         public string Name                     { get; set; } = "";
+        [DataMember]
         public string Path                     { get; set; } = "";
+        [DataMember]
         public bool   RemoveDiacritics         { get; set; } = false;
+        [DataMember]
         public bool   RemoveEditionSuffix      { get; set; } = false;
+        [DataMember]
         public bool   RemoveHyphens            { get; set; } = false;
+        [DataMember]
         public bool   RemoveSpecialChars       { get; set; } = false;
+        [DataMember]
         public bool   RemoveWhitespaces        { get; set; } = false;
+        [DataMember]
         public bool   UnderscoresToWhitespaces { get; set; } = false;
+        [DataMember]
         public bool   WhitespacesToHyphens     { get; set; } = false;
+        [DataMember]
         public bool   WhitespacesToUnderscores { get; set; } = false;
     }
 
     // ──────────────────────────────────────────────
-    // JSON simples sem dependência externa
+    // JSON via System.Runtime.Serialization
     // ──────────────────────────────────────────────
     internal static class SimpleJson
     {
         public static LocalProviderConfig? Deserialize(string json)
         {
-            // Usa o serializer do Playnite SDK que já está disponível
-            return Newtonsoft.Json.JsonConvert.DeserializeObject<LocalProviderConfig>(json);
+            var serializer = new System.Runtime.Serialization.Json.DataContractJsonSerializer(
+                typeof(LocalProviderConfig));
+            using var ms = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(json));
+            return serializer.ReadObject(ms) as LocalProviderConfig;
         }
 
         public static string Serialize(LocalProviderConfig config)
         {
-            return Newtonsoft.Json.JsonConvert.SerializeObject(config,
-                Newtonsoft.Json.Formatting.Indented);
+            var serializer = new System.Runtime.Serialization.Json.DataContractJsonSerializer(
+                typeof(LocalProviderConfig),
+                new System.Runtime.Serialization.Json.DataContractJsonSerializerSettings
+                {
+                    UseSimpleDictionaryFormat = true
+                });
+            using var ms = new System.IO.MemoryStream();
+            serializer.WriteObject(ms, config);
+            var json = System.Text.Encoding.UTF8.GetString(ms.ToArray());
+            // Pretty print manually
+            return PrettyPrint(json);
+        }
+
+        private static string PrettyPrint(string json)
+        {
+            var sb = new System.Text.StringBuilder();
+            int indent = 0;
+            bool inString = false;
+            foreach (var c in json)
+            {
+                if (c == '"' && (sb.Length == 0 || sb[sb.Length - 1] != '\\'))
+                    inString = !inString;
+
+                if (!inString)
+                {
+                    if (c == '{' || c == '[')
+                    {
+                        sb.Append(c);
+                        sb.Append("\n");
+                        indent++;
+                        sb.Append(new string(' ', indent * 2));
+                        continue;
+                    }
+                    if (c == '}' || c == ']')
+                    {
+                        sb.Append("\n");
+                        indent--;
+                        sb.Append(new string(' ', indent * 2));
+                        sb.Append(c);
+                        continue;
+                    }
+                    if (c == ',')
+                    {
+                        sb.Append(c);
+                        sb.Append("\n");
+                        sb.Append(new string(' ', indent * 2));
+                        continue;
+                    }
+                    if (c == ':')
+                    {
+                        sb.Append(": ");
+                        continue;
+                    }
+                }
+                sb.Append(c);
+            }
+            return sb.ToString();
         }
     }
 }
