@@ -69,8 +69,10 @@ namespace GameSnapPlugin
         public List<string> WindowBlacklist { get; set; } = new List<string>
         {
             "explorer", "notepad", "settings", "task manager",
-            "chrome", "edge", "opera", "steam", "discord",
-            "launcher", "update", "setup", "windows", "desktop"
+            "chrome", "edge", "opera", "firefox", "brave",
+            "discord", "steam", "launcher", "update", "setup",
+            "windows", "desktop", "playnite", "visual studio",
+            "code", "powershell", "cmd", "terminal"
         };
     }
 }

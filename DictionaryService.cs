@@ -6,8 +6,8 @@ using System.Text;
 namespace GameSnapPlugin
 {
     /// <summary>
-    /// Gerencia o dictionary.txt com blocos [NomeJogo] e aliases abaixo.
-    /// Formato:
+    /// Manages dictionary.txt with blocks [GameName] and aliases below.
+    /// Format:
     ///   [Cyberpunk 2077]
     ///   Cyberpunk2077
     ///   cyberpunk
@@ -24,7 +24,7 @@ namespace GameSnapPlugin
         public string DictionaryPath => _dictionaryPath;
 
         /// <summary>
-        /// Carrega o dicionário: chave = alias normalizado, valor = nome do jogo.
+        /// Loads dictionary: key = normalized alias, value = game name.
         /// </summary>
         public Dictionary<string, string> Load()
         {
@@ -38,17 +38,23 @@ namespace GameSnapPlugin
             foreach (var rawLine in File.ReadAllLines(_dictionaryPath, Encoding.UTF8))
             {
                 var line = rawLine.Trim();
+                if (string.IsNullOrEmpty(line) || line.StartsWith("#"))
+                    continue;
 
                 if (line.StartsWith("[") && line.EndsWith("]"))
                 {
                     currentGame = line.Substring(1, line.Length - 2).Trim();
+                    // Also map the game name itself as an alias
+                    var normGame = Normalize(currentGame);
+                    if (!string.IsNullOrEmpty(normGame) && !dict.ContainsKey(normGame))
+                        dict[normGame] = currentGame;
                     continue;
                 }
 
-                if (!string.IsNullOrEmpty(line) && currentGame != null)
+                if (currentGame != null && !string.IsNullOrEmpty(line))
                 {
                     var key = Normalize(line);
-                    if (!dict.ContainsKey(key))
+                    if (!string.IsNullOrEmpty(key) && !dict.ContainsKey(key))
                         dict[key] = currentGame;
                 }
             }
@@ -57,8 +63,8 @@ namespace GameSnapPlugin
         }
 
         /// <summary>
-        /// Salva um alias aprendido automaticamente no bloco do jogo.
-        /// Não duplica se já existir.
+        /// Saves a learned alias to dictionary.txt.
+        /// Creates the file with a header if it does not exist.
         /// </summary>
         public void SaveAlias(string prefix, string gameName)
         {
@@ -68,65 +74,63 @@ namespace GameSnapPlugin
             prefix   = prefix.Trim();
             gameName = gameName.Trim();
 
-            var dict = Load();
-            if (dict.ContainsKey(Normalize(prefix)))
-                return; // já existe
+            // Don't save if already known
+            var existing = Load();
+            if (existing.TryGetValue(Normalize(prefix), out var known) &&
+                string.Equals(known, gameName, StringComparison.OrdinalIgnoreCase))
+                return;
 
-            var lines = File.Exists(_dictionaryPath)
-                ? new List<string>(File.ReadAllLines(_dictionaryPath, Encoding.UTF8))
-                : new List<string>();
+            // Create file with header if missing
+            if (!File.Exists(_dictionaryPath))
+            {
+                File.WriteAllText(_dictionaryPath,
+                    "# GameSnap Dictionary\n" +
+                    "# Format:\n" +
+                    "# [Game Name]\n" +
+                    "# alias1\n" +
+                    "# alias2\n\n",
+                    Encoding.UTF8);
+            }
 
-            var newLines  = new List<string>();
-            bool inBlock  = false;
-            bool blockFound   = false;
-            string? currentGame = null;
+            var lines    = new List<string>(File.ReadAllLines(_dictionaryPath, Encoding.UTF8));
+            var header   = $"[{gameName}]";
+            int blockIdx = -1;
 
+            // Find existing block for this game
             for (int i = 0; i < lines.Count; i++)
             {
-                var line = lines[i];
-                newLines.Add(line);
-
-                if (line.Trim().StartsWith("[") && line.Trim().EndsWith("]"))
+                if (string.Equals(lines[i].Trim(), header, StringComparison.OrdinalIgnoreCase))
                 {
-                    currentGame = line.Trim().Substring(1, line.Trim().Length - 2).Trim();
-                    inBlock = string.Equals(currentGame, gameName, StringComparison.OrdinalIgnoreCase);
-
-                    if (inBlock)
-                    {
-                        blockFound = true;
-
-                        // Procura o fim do bloco e insere antes
-                        int j = i + 1;
-                        bool alreadyThere = false;
-                        while (j < lines.Count && !(lines[j].Trim().StartsWith("[") && lines[j].Trim().EndsWith("]")))
-                        {
-                            if (string.Equals(Normalize(lines[j]), Normalize(prefix), StringComparison.OrdinalIgnoreCase))
-                            {
-                                alreadyThere = true;
-                                break;
-                            }
-                            newLines.Add(lines[j]);
-                            j++;
-                        }
-
-                        if (!alreadyThere)
-                            newLines.Add(prefix);
-
-                        // Continua do ponto correto
-                        i = j - 1;
-                    }
+                    blockIdx = i;
+                    break;
                 }
             }
 
-            if (!blockFound)
+            if (blockIdx >= 0)
             {
-                if (newLines.Count > 0)
-                    newLines.Add("");
-                newLines.Add($"[{gameName}]");
-                newLines.Add(prefix);
+                // Check if alias already exists in the block
+                int j = blockIdx + 1;
+                while (j < lines.Count &&
+                       !(lines[j].Trim().StartsWith("[") && lines[j].Trim().EndsWith("]")))
+                {
+                    if (string.Equals(lines[j].Trim(), prefix, StringComparison.OrdinalIgnoreCase))
+                        return; // already there
+                    j++;
+                }
+
+                // Insert alias right after the block header
+                lines.Insert(blockIdx + 1, prefix);
+            }
+            else
+            {
+                // Add new block at the end
+                if (lines.Count > 0 && !string.IsNullOrEmpty(lines[lines.Count - 1]))
+                    lines.Add("");
+                lines.Add(header);
+                lines.Add(prefix);
             }
 
-            File.WriteAllLines(_dictionaryPath, newLines, Encoding.UTF8);
+            File.WriteAllLines(_dictionaryPath, lines, Encoding.UTF8);
         }
 
         public static string Normalize(string text)

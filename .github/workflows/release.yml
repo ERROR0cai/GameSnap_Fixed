@@ -37,27 +37,8 @@ jobs:
           Rename-Item -Path "tmp.zip" -NewName $pextName
           echo "PEXT_NAME=$pextName" >> $env:GITHUB_OUTPUT
 
-      - name: Extrair notas do CHANGELOG
-        id: changelog
-        run: |
-          $version = "${{ github.ref_name }}".TrimStart("v")
-          $content = Get-Content CHANGELOG.md -Raw -Encoding UTF8
-
-          # Extrai o bloco da versão atual
-          $pattern = "## \[$version\].*?(?=## \[|\z)"
-          $match = [regex]::Match($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::Singleline)
-
-          if ($match.Success) {
-              $notes = $match.Value.Trim()
-          } else {
-              $notes = "See CHANGELOG.md for details."
-          }
-
-          $notes | Out-File -FilePath "release_notes.txt" -Encoding UTF8
-          echo "NOTES_FILE=release_notes.txt" >> $env:GITHUB_OUTPUT
-
       - name: Publicar Release no GitHub
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.pext.outputs.PEXT_NAME }}
-          body_path: release_notes.txt
+          generate_release_notes: true

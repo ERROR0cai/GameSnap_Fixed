@@ -22,7 +22,15 @@ namespace GameSnapPlugin
         public GameSnapSettings Settings
         {
             get => _settings;
-            set { _settings = value; OnPropertyChanged(); }
+            set
+            {
+                _settings = value;
+                OnPropertyChanged();
+                // Force all bound fields to refresh when settings object changes
+                OnPropertyChanged(nameof(ImageExtensionsText));
+                OnPropertyChanged(nameof(VideoExtensionsText));
+                OnPropertyChanged(nameof(AdditionalSourcesText));
+            }
         }
 
         // Extensions text bindings
@@ -96,7 +104,14 @@ namespace GameSnapPlugin
 
         public void BeginEdit()
         {
-            _editingClone = CloneSettings(_settings);
+            // Always reload from disk when opening settings
+            // This ensures the UI reflects what was actually saved
+            _settings      = _plugin.LoadSettings();
+            _editingClone  = CloneSettings(_settings);
+            OnPropertyChanged(nameof(Settings));
+            OnPropertyChanged(nameof(ImageExtensionsText));
+            OnPropertyChanged(nameof(VideoExtensionsText));
+            OnPropertyChanged(nameof(AdditionalSourcesText));
         }
 
         public void CancelEdit()
@@ -107,8 +122,29 @@ namespace GameSnapPlugin
 
         public void EndEdit()
         {
+            // Force sync of text-bound fields back to the settings object
+            _settings.ImageExtensions       = ParseExtensions(ImageExtensionsText);
+            _settings.VideoExtensions       = ParseExtensions(VideoExtensionsText);
+            _settings.AdditionalSourceFolders = ParseLines(AdditionalSourcesText);
+
             _plugin.SaveSettings(_settings);
             _plugin.ApplySettings(_settings);
+        }
+
+        private static System.Collections.Generic.List<string> ParseExtensions(string text)
+        {
+            return new System.Collections.Generic.List<string>(
+                text.Split(new char[] { ',' }, System.StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim().ToLowerInvariant())
+                    .Where(s => s.StartsWith(".")));
+        }
+
+        private static System.Collections.Generic.List<string> ParseLines(string text)
+        {
+            return new System.Collections.Generic.List<string>(
+                text.Split(new char[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim())
+                    .Where(s => !string.IsNullOrEmpty(s)));
         }
 
         public bool VerifySettings(out List<string> errors)
@@ -150,14 +186,22 @@ namespace GameSnapPlugin
             var path = Path.Combine(_plugin.GetPluginUserDataPath(), "dictionary.txt");
             if (!File.Exists(path))
                 File.WriteAllText(path, "# Format:\n# [Game Name]\n# alias1\n");
-            System.Diagnostics.Process.Start("notepad.exe", path);
+            var psi = new System.Diagnostics.ProcessStartInfo("notepad.exe", path)
+            {
+                UseShellExecute = true
+            };
+            System.Diagnostics.Process.Start(psi);
         }
 
         private void OpenLog()
         {
             var path = Path.Combine(_plugin.GetPluginUserDataPath(), "gamesnap.log");
             if (File.Exists(path))
-                System.Diagnostics.Process.Start("notepad.exe", path);
+                var psi = new System.Diagnostics.ProcessStartInfo("notepad.exe", path)
+            {
+                UseShellExecute = true
+            };
+            System.Diagnostics.Process.Start(psi);
             else
                 _plugin.PlayniteApi.Dialogs.ShowMessage("No log file yet.", "GameSnap");
         }

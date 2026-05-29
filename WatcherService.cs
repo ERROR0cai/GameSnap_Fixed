@@ -65,8 +65,9 @@ namespace GameSnapPlugin
 
         private void OnFileCreated(object sender, FileSystemEventArgs e)
         {
-            // Pequeno delay para garantir que o arquivo foi completamente escrito
-            Task.Delay(2000).ContinueWith(_ => SafeOrganize());
+            // Delay then organize fully off the watcher thread — never blocks Playnite
+            Task.Delay(2000).ContinueWith(_ =>
+                Task.Run(() => SafeOrganize()));
         }
 
         private void OnWatcherError(object sender, ErrorEventArgs e)

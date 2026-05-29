@@ -187,7 +187,8 @@ namespace GameSnapPlugin
 
             if (!isImage && !isVideo) return;
 
-            System.Threading.Thread.Sleep(1000);
+            // Small delay to ensure file is fully written — non-blocking
+            System.Threading.Thread.Sleep(800);
 
             var fileName = Path.GetFileName(filePath);
             var prefix   = GetPrefix(fileName);
@@ -208,25 +209,59 @@ namespace GameSnapPlugin
             {
                 game   = _currentGame;
                 method = "PLAYNITE";
-                _dictionary.SaveAlias(prefix, _currentGame);
-                _logger.Write(LogType.Learn, $"Prefix: {prefix}\nGame: {_currentGame}");
+                // Auto-learn: save prefix → game mapping so future files skip detection
+                if (!string.IsNullOrEmpty(prefix) && prefix.Length > 2)
+                {
+                    _dictionary.SaveAlias(prefix, _currentGame);
+                    _logger.Write(LogType.Learn, $"Prefix: {prefix}\nGame: {_currentGame}");
+                }
             }
 
             // 3. Janela ativa
-            if (game == null && _settings.UseWindowFallback)
+            // Opção D: só ativa durante sessão de jogo (entre OnGameStarted e OnGameStopped)
+            // Opção C: só ativa se o prefixo já existe no dicionário (jogo conhecido fora do Playnite)
+            bool inGameSession  = _currentGame != null;
+            bool prefixKnown    = dict.ContainsKey(normPfx);
+            bool canUseFallback = _settings.UseWindowFallback && (inGameSession || prefixKnown);
+
+            if (game == null && canUseFallback)
             {
                 var win = GetActiveWindowTitle();
                 if (!string.IsNullOrEmpty(win) && win.Length > 4)
                 {
                     var normWin = DictionaryService.Normalize(win);
+
+                    // Blacklist expandida — rejeita janelas que claramente não são jogos
                     bool blocked = _settings.WindowBlacklist.Any(b =>
                         normWin.IndexOf(b, StringComparison.OrdinalIgnoreCase) >= 0);
 
-                    if (!blocked)
+                    // Rejeita títulos com padrões típicos de sistema/browser
+                    bool looksLikeSystem =
+                        normWin.Contains("explorador de arquivos") ||
+                        normWin.Contains("file explorer") ||
+                        normWin.Contains("mais guias") ||       // "e 3 mais guias"
+                        normWin.Contains("more tabs") ||
+                        normWin.Contains("google drive") ||
+                        normWin.Contains("onedrive") ||
+                        normWin.Contains("hotmail") ||
+                        normWin.Contains("playnite") ||         // "+Playnite", "Playnite", etc.
+                        normWin.Contains("gmail") ||
+                        normWin.Contains("outlook") ||
+                        normWin.Contains(" - explorador") ||
+                        normWin.Contains(" - explorer") ||
+                        normWin.Contains("playnite") ||         // evita pasta do Playnite
+                        normWin.Length < 3;
+
+                    if (!blocked && !looksLikeSystem)
                     {
                         game   = win;
                         method = "WINDOW";
                         _logger.Write(LogType.Fallback, $"Prefix: {prefix}\nDetected: {win}");
+                    }
+                    else
+                    {
+                        _logger.Write(LogType.Info,
+                            $"Fallback blocked: {win}\nFile: {fileName}");
                     }
                 }
             }

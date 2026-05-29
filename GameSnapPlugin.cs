@@ -28,9 +28,19 @@ namespace GameSnapPlugin
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            _settings = LoadPluginSettings<GameSnapSettings>() ?? new GameSnapSettings();
+            // Load settings synchronously — must complete before GetSettings() is called
+            _settings = LoadSettings();
             InitServices(_settings);
-            _watcher?.Start();
+
+            // Start watcher in background to avoid blocking Playnite startup
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try { _watcher?.Start(); }
+                catch (Exception ex)
+                {
+                    _logger?.Error($"Watcher start error: {ex.Message}");
+                }
+            });
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
@@ -84,7 +94,33 @@ namespace GameSnapPlugin
 
         public GameSnapSettings LoadSettings()
         {
-            _settings = LoadPluginSettings<GameSnapSettings>() ?? new GameSnapSettings();
+            var saved    = LoadPluginSettings<GameSnapSettings>();
+            var defaults = new GameSnapSettings();
+
+            if (saved == null)
+            {
+                _settings = defaults;
+                return _settings;
+            }
+
+            // Merge: preserve saved values, fill new fields with defaults
+            // This ensures settings survive plugin updates that add new options
+            if (saved.ImageExtensions == null || saved.ImageExtensions.Count == 0)
+                saved.ImageExtensions = defaults.ImageExtensions;
+            if (saved.VideoExtensions == null || saved.VideoExtensions.Count == 0)
+                saved.VideoExtensions = defaults.VideoExtensions;
+            if (saved.WindowBlacklist == null || saved.WindowBlacklist.Count == 0)
+                saved.WindowBlacklist = defaults.WindowBlacklist;
+            if (saved.AdditionalSourceFolders == null)
+                saved.AdditionalSourceFolders = defaults.AdditionalSourceFolders;
+            if (string.IsNullOrEmpty(saved.UnmatchedFolderName))
+                saved.UnmatchedFolderName = defaults.UnmatchedFolderName;
+            if (string.IsNullOrEmpty(saved.RenamePattern))
+                saved.RenamePattern = defaults.RenamePattern;
+            if (saved.PollingIntervalSeconds <= 0)
+                saved.PollingIntervalSeconds = defaults.PollingIntervalSeconds;
+
+            _settings = saved;
             return _settings;
         }
 
@@ -96,8 +132,12 @@ namespace GameSnapPlugin
 
         public void ApplySettings(GameSnapSettings settings)
         {
-            _watcher?.Stop();
-            _watcher?.Dispose();
+            if (_watcher != null)
+            {
+                _watcher.Stop();
+                _watcher.Dispose();
+                _watcher = null;
+            }
             InitServices(settings);
             _watcher?.Start();
         }
@@ -178,7 +218,11 @@ namespace GameSnapPlugin
                 {
                     var path = Path.Combine(GetPluginUserDataPath(), "gamesnap.log");
                     if (File.Exists(path))
-                        System.Diagnostics.Process.Start("notepad.exe", path);
+                        var psi = new System.Diagnostics.ProcessStartInfo("notepad.exe", path)
+                    {
+                        UseShellExecute = true
+                    };
+                    System.Diagnostics.Process.Start(psi);
                 }
             };
 
@@ -191,7 +235,11 @@ namespace GameSnapPlugin
                     var path = Path.Combine(GetPluginUserDataPath(), "dictionary.txt");
                     if (!File.Exists(path))
                         File.WriteAllText(path, "# Format:\n# [Game Name]\n# alias1\n");
-                    System.Diagnostics.Process.Start("notepad.exe", path);
+                    var psi = new System.Diagnostics.ProcessStartInfo("notepad.exe", path)
+                    {
+                        UseShellExecute = true
+                    };
+                    System.Diagnostics.Process.Start(psi);
                 }
             };
 
