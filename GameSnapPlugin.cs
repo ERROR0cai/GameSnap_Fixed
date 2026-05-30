@@ -106,7 +106,7 @@ namespace GameSnapPlugin
             => new SettingsViewModel(this);
 
         public override UserControl GetSettingsView(bool firstRunSettings)
-            => new Views.SettingsView();
+            => new Views.SettingsTabView();
 
         public GameSnapSettings LoadSettings()
         {
@@ -130,8 +130,19 @@ namespace GameSnapPlugin
                     saved.WindowBlacklist = defaults.WindowBlacklist;
                 if (saved.AdditionalSourceFolders == null)
                     saved.AdditionalSourceFolders = defaults.AdditionalSourceFolders;
-                if (saved.CustomEmulatorFolders == null)
-                    saved.CustomEmulatorFolders = defaults.CustomEmulatorFolders;
+                if (saved.EmulatorProfiles == null || saved.EmulatorProfiles.Count == 0)
+                    saved.EmulatorProfiles = defaults.EmulatorProfiles;
+                else
+                {
+                    // Merge: ensure all built-in emulators exist, preserve user settings
+                    foreach (var builtIn in EmulatorProfile.BuiltInNames)
+                    {
+                        if (!saved.EmulatorProfiles.Any(p => p.Name == builtIn))
+                            saved.EmulatorProfiles.Insert(
+                                System.Array.IndexOf(EmulatorProfile.BuiltInNames, builtIn),
+                                new EmulatorProfile { Name = builtIn, Enabled = false });
+                    }
+                }
                 if (string.IsNullOrEmpty(saved.UnmatchedFolderName))
                     saved.UnmatchedFolderName = defaults.UnmatchedFolderName;
                 if (string.IsNullOrEmpty(saved.RenamePattern))

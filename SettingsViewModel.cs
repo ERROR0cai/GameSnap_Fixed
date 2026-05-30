@@ -30,7 +30,6 @@ namespace GameSnapPlugin
                 OnPropertyChanged(nameof(ImageExtensionsText));
                 OnPropertyChanged(nameof(VideoExtensionsText));
                 OnPropertyChanged(nameof(AdditionalSourcesText));
-            OnPropertyChanged(nameof(CustomEmulatorFoldersText));
             }
         }
 
@@ -62,19 +61,6 @@ namespace GameSnapPlugin
         }
 
         // Additional sources text binding (one per line)
-        public string CustomEmulatorFoldersText
-        {
-            get => string.Join(Environment.NewLine, _settings.CustomEmulatorFolders);
-            set
-            {
-                _settings.CustomEmulatorFolders = new List<string>(
-                    value.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                         .Select(s => s.Trim())
-                         .Where(s => !string.IsNullOrEmpty(s)));
-                OnPropertyChanged();
-            }
-        }
-
         public string AdditionalSourcesText
         {
             get => string.Join(Environment.NewLine, _settings.AdditionalSourceFolders);
@@ -102,6 +88,8 @@ namespace GameSnapPlugin
         public ICommand BrowseSteamCommand       { get; }
         public ICommand OpenDictionaryCommand    { get; }
         public ICommand OpenLogCommand           { get; }
+        public ICommand AddEmulatorCommand       { get; }
+        public ICommand RemoveEmulatorCommand    { get; }
 
         public SettingsViewModel(GameSnapPlugin plugin)
         {
@@ -114,6 +102,8 @@ namespace GameSnapPlugin
             BrowseSteamCommand       = new RelayCommand(BrowseSteam);
             OpenDictionaryCommand    = new RelayCommand(OpenDictionary);
             OpenLogCommand           = new RelayCommand(OpenLog);
+            AddEmulatorCommand       = new RelayCommand(AddEmulator);
+            RemoveEmulatorCommand    = new RelayCommand(RemoveEmulator);
         }
 
         public void BeginEdit()
@@ -126,7 +116,6 @@ namespace GameSnapPlugin
             OnPropertyChanged(nameof(ImageExtensionsText));
             OnPropertyChanged(nameof(VideoExtensionsText));
             OnPropertyChanged(nameof(AdditionalSourcesText));
-            OnPropertyChanged(nameof(CustomEmulatorFoldersText));
             OnPropertyChanged(nameof(BackupFolder));
         }
 
@@ -144,8 +133,7 @@ namespace GameSnapPlugin
                 _settings.ImageExtensions         = ParseExtensions(ImageExtensionsText);
                 _settings.VideoExtensions         = ParseExtensions(VideoExtensionsText);
                 _settings.AdditionalSourceFolders = ParseLines(AdditionalSourcesText);
-                _settings.CustomEmulatorFolders   = ParseLines(CustomEmulatorFoldersText);
-
+    
                 _plugin.SaveSettings(_settings);
                 _plugin.ApplySettings(_settings);
             }
@@ -206,6 +194,42 @@ namespace GameSnapPlugin
             if (path != null) { _settings.SteamPath = path; OnPropertyChanged(nameof(Settings)); }
         }
 
+        public string? BrowseForFolder()
+            => _plugin.PlayniteApi.Dialogs.SelectFolder();
+
+        private void AddEmulator()
+        {
+            var name = _plugin.PlayniteApi.Dialogs.SelectString("", "Add Emulator", "Emulator name:");
+            if (string.IsNullOrWhiteSpace(name)) return;
+
+            if (_settings.EmulatorProfiles == null)
+                _settings.EmulatorProfiles = new List<EmulatorProfile>();
+
+            _settings.EmulatorProfiles.Add(new EmulatorProfile
+            {
+                Name        = name,
+                Enabled     = true,
+                IsUserAdded = true
+            });
+            OnPropertyChanged(nameof(Settings));
+        }
+
+        private void RemoveEmulator()
+        {
+            if (_settings.EmulatorProfiles == null) return;
+
+            // Remove last user-added emulator
+            for (int i = _settings.EmulatorProfiles.Count - 1; i >= 0; i--)
+            {
+                if (_settings.EmulatorProfiles[i].IsUserAdded)
+                {
+                    _settings.EmulatorProfiles.RemoveAt(i);
+                    OnPropertyChanged(nameof(Settings));
+                    return;
+                }
+            }
+        }
+
         private void OpenDictionary()
         {
             var path = Path.Combine(_plugin.GetPluginUserDataPath(), "dictionary.txt");
@@ -251,8 +275,14 @@ namespace GameSnapPlugin
             EnableSteamSupport              = src.EnableSteamSupport,
             SteamPath                       = src.SteamPath,
             EnableLocalProviderIntegration  = src.EnableLocalProviderIntegration,
-            EnableEmulatorSupport           = src.EnableEmulatorSupport,
-            CustomEmulatorFolders           = new List<string>(src.CustomEmulatorFolders),
+            EnableEmulatorSupport = src.EnableEmulatorSupport,
+            EmulatorProfiles      = src.EmulatorProfiles?.Select(p => new EmulatorProfile
+            {
+                Name        = p.Name,
+                Enabled     = p.Enabled,
+                CustomPath  = p.CustomPath,
+                IsUserAdded = p.IsUserAdded
+            }).ToList() ?? EmulatorProfile.CreateDefaults(),
             ImageExtensions           = new List<string>(src.ImageExtensions),
             VideoExtensions           = new List<string>(src.VideoExtensions),
             WindowBlacklist           = new List<string>(src.WindowBlacklist),

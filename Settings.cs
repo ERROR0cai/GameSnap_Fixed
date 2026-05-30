@@ -56,8 +56,8 @@ namespace GameSnapPlugin
         // Suporte a emuladores (desativado por padrão)
         public bool EnableEmulatorSupport { get; set; } = false;
 
-        // Caminhos customizados de screenshots de emuladores (um por linha)
-        public List<string> CustomEmulatorFolders { get; set; } = new List<string>();
+        // Per-emulator profiles
+        public List<EmulatorProfile> EmulatorProfiles { get; set; } = EmulatorProfile.CreateDefaults();
 
         // Extensões de imagem monitoradas
         public List<string> ImageExtensions { get; set; } = new List<string>
