@@ -53,6 +53,12 @@ namespace GameSnapPlugin
         // Integração com Screenshots Utilities Local Provider (desativado por padrão)
         public bool EnableLocalProviderIntegration { get; set; } = false;
 
+        // Suporte a emuladores (desativado por padrão)
+        public bool EnableEmulatorSupport { get; set; } = false;
+
+        // Caminhos customizados de screenshots de emuladores (um por linha)
+        public List<string> CustomEmulatorFolders { get; set; } = new List<string>();
+
         // Extensões de imagem monitoradas
         public List<string> ImageExtensions { get; set; } = new List<string>
         {

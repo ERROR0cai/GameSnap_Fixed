@@ -189,6 +189,25 @@
 
             <Separator Margin="0,4,0,12"/>
 
+            <!-- Emulators -->
+            <TextBlock Text="Emulator Screenshots" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
+
+            <CheckBox Content="Enable emulator screenshot support (disabled by default)"
+                      IsChecked="{Binding Settings.EnableEmulatorSupport}"
+                      Margin="0,0,0,4"
+                      ToolTip="Monitors known emulator screenshot folders (RetroArch, PCSX2, Dolphin, DuckStation, PPSSPP, Cemu) and moves screenshots to the matching game folder. Game names are resolved using the ROM/disc name and your Playnite library. Disabled by default."/>
+            <TextBlock Style="{StaticResource TipLabel}"
+                       Text="Auto-detects RetroArch, PCSX2, Dolphin, DuckStation, PPSSPP and Cemu. Add custom emulator folders below if yours is not listed."/>
+
+            <TextBlock Text="Custom emulator screenshot folders (one per line):" Margin="0,0,0,4"
+                       ToolTip="Add any emulator screenshot folder not auto-detected. One path per line."/>
+            <TextBox Text="{Binding CustomEmulatorFoldersText, UpdateSourceTrigger=PropertyChanged}"
+                     Height="60" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                     Margin="0,0,0,12"
+                     ToolTip="Example: C:\Emulators\RPCS3\screenshots"/>
+
+            <Separator Margin="0,4,0,12"/>
+
             <!-- Steam -->
             <TextBlock Text="Steam Screenshots" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
 

@@ -30,6 +30,7 @@ namespace GameSnapPlugin
                 OnPropertyChanged(nameof(ImageExtensionsText));
                 OnPropertyChanged(nameof(VideoExtensionsText));
                 OnPropertyChanged(nameof(AdditionalSourcesText));
+            OnPropertyChanged(nameof(CustomEmulatorFoldersText));
             }
         }
 
@@ -61,6 +62,19 @@ namespace GameSnapPlugin
         }
 
         // Additional sources text binding (one per line)
+        public string CustomEmulatorFoldersText
+        {
+            get => string.Join(Environment.NewLine, _settings.CustomEmulatorFolders);
+            set
+            {
+                _settings.CustomEmulatorFolders = new List<string>(
+                    value.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                         .Select(s => s.Trim())
+                         .Where(s => !string.IsNullOrEmpty(s)));
+                OnPropertyChanged();
+            }
+        }
+
         public string AdditionalSourcesText
         {
             get => string.Join(Environment.NewLine, _settings.AdditionalSourceFolders);
@@ -112,6 +126,8 @@ namespace GameSnapPlugin
             OnPropertyChanged(nameof(ImageExtensionsText));
             OnPropertyChanged(nameof(VideoExtensionsText));
             OnPropertyChanged(nameof(AdditionalSourcesText));
+            OnPropertyChanged(nameof(CustomEmulatorFoldersText));
+            OnPropertyChanged(nameof(BackupFolder));
         }
 
         public void CancelEdit()
@@ -122,13 +138,22 @@ namespace GameSnapPlugin
 
         public void EndEdit()
         {
-            // Force sync of text-bound fields back to the settings object
-            _settings.ImageExtensions       = ParseExtensions(ImageExtensionsText);
-            _settings.VideoExtensions       = ParseExtensions(VideoExtensionsText);
-            _settings.AdditionalSourceFolders = ParseLines(AdditionalSourcesText);
+            try
+            {
+                // Sync all text-bound fields back to settings object before saving
+                _settings.ImageExtensions         = ParseExtensions(ImageExtensionsText);
+                _settings.VideoExtensions         = ParseExtensions(VideoExtensionsText);
+                _settings.AdditionalSourceFolders = ParseLines(AdditionalSourcesText);
+                _settings.CustomEmulatorFolders   = ParseLines(CustomEmulatorFoldersText);
 
-            _plugin.SaveSettings(_settings);
-            _plugin.ApplySettings(_settings);
+                _plugin.SaveSettings(_settings);
+                _plugin.ApplySettings(_settings);
+            }
+            catch (Exception ex)
+            {
+                _plugin.PlayniteApi.Dialogs.ShowErrorMessage(
+                    $"GameSnap failed to save settings:\n{ex.Message}", "GameSnap");
+            }
         }
 
         private static System.Collections.Generic.List<string> ParseExtensions(string text)
@@ -226,6 +251,8 @@ namespace GameSnapPlugin
             EnableSteamSupport              = src.EnableSteamSupport,
             SteamPath                       = src.SteamPath,
             EnableLocalProviderIntegration  = src.EnableLocalProviderIntegration,
+            EnableEmulatorSupport           = src.EnableEmulatorSupport,
+            CustomEmulatorFolders           = new List<string>(src.CustomEmulatorFolders),
             ImageExtensions           = new List<string>(src.ImageExtensions),
             VideoExtensions           = new List<string>(src.VideoExtensions),
             WindowBlacklist           = new List<string>(src.WindowBlacklist),

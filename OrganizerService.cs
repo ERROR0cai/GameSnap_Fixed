@@ -38,11 +38,18 @@ namespace GameSnapPlugin
         // Steam service reference (set by plugin)
         public SteamService? SteamService { get; set; }
 
+        // Emulator service reference (set by plugin)
+        public EmulatorService? EmulatorService { get; set; }
+
         public void Organize()
         {
             // Steam screenshots
             if (_settings.EnableSteamSupport && SteamService != null)
                 OrganizeSteam();
+
+            // Emulator screenshots
+            if (_settings.EnableEmulatorSupport && EmulatorService != null)
+                OrganizeEmulators();
 
             var allSources = new List<string>();
 
@@ -167,6 +174,94 @@ namespace GameSnapPlugin
             {
                 var summary = string.Join(" | ", counts.Select(kv => $"{kv.Key} ({kv.Value})"));
                 OnFileMoved?.Invoke("GameSnap", $"Steam: {counts.Values.Sum()} screenshot(s): {summary}");
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        // Emulators
+        // ──────────────────────────────────────────────
+        private void OrganizeEmulators()
+        {
+            if (EmulatorService == null) return;
+
+            var pending = EmulatorService.GetPendingScreenshots();
+            if (pending.Count == 0) return;
+
+            var folders = LoadFolders();
+            var counts  = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var ss in pending)
+            {
+                if (_processed.Contains(ss.FilePath)) continue;
+
+                var normGame = DictionaryService.Normalize(ss.GameName);
+                var match = folders
+                    .Where(f => f.NameNorm.Contains(normGame) || normGame.Contains(f.NameNorm))
+                    .OrderByDescending(f => f.NameNorm.Length)
+                    .FirstOrDefault();
+
+                if (match == null)
+                {
+                    // Auto-create if enabled
+                    if (_settings.AutoCreateFolders)
+                    {
+                        var invalid    = Path.GetInvalidFileNameChars();
+                        var folderName = string.Concat(ss.GameName.Split(invalid)).Trim();
+                        var newPath    = Path.Combine(_settings.DestinationBase, folderName);
+                        Directory.CreateDirectory(newPath);
+                        folders = LoadFolders(); // refresh
+                        match = folders.FirstOrDefault(f =>
+                            DictionaryService.Normalize(f.NameOriginal) == DictionaryService.Normalize(folderName));
+                    }
+
+                    if (match == null)
+                    {
+                        _logger.Write(LogType.Error,
+                            $"Emulator [{ss.Emulator}]: No folder for '{ss.GameName}'. File: {Path.GetFileName(ss.FilePath)}");
+                        TryMoveToUnmatched(ss.FilePath, Path.GetExtension(ss.FilePath).ToLowerInvariant());
+                        continue;
+                    }
+                }
+
+                var ext      = Path.GetExtension(ss.FilePath).ToLowerInvariant();
+                var date     = GetBestDate(ss.FilePath);
+                var destName = BuildDestName(match.NameOriginal, date,
+                                            Path.GetFileNameWithoutExtension(ss.FilePath), ext);
+                var destPath = Path.Combine(match.Path, destName);
+
+                int i = 1;
+                while (File.Exists(destPath))
+                {
+                    var nameNoExt = Path.GetFileNameWithoutExtension(destName);
+                    destPath = Path.Combine(match.Path, $"{nameNoExt}_{i}{ext}");
+                    i++;
+                }
+
+                try
+                {
+                    File.Move(ss.FilePath, destPath);
+
+                    if (_settings.EnableBackup && !string.IsNullOrEmpty(_settings.BackupFolder))
+                        TryBackup(destPath, match.NameOriginal, false);
+
+                    _processed.Add(ss.FilePath);
+
+                    int current = counts.ContainsKey(match.NameOriginal) ? counts[match.NameOriginal] : 0;
+                    counts[match.NameOriginal] = current + 1;
+
+                    _logger.Write(LogType.Move,
+                        $"Emulator [{ss.Emulator}]: {Path.GetFileName(ss.FilePath)} → {match.NameOriginal}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"Emulator move failed: {ex.Message}");
+                }
+            }
+
+            if (counts.Count > 0)
+            {
+                var summary = string.Join(" | ", counts.Select(kv => $"{kv.Key} ({kv.Value})"));
+                OnFileMoved?.Invoke("GameSnap", $"Emulators: {counts.Values.Sum()} screenshot(s): {summary}");
             }
         }
 
