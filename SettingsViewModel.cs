@@ -199,15 +199,16 @@ namespace GameSnapPlugin
 
         private void AddEmulator()
         {
-            var name = _plugin.PlayniteApi.Dialogs.SelectString("", "Add Emulator", "Emulator name:");
-            if (string.IsNullOrWhiteSpace(name)) return;
+            var result = _plugin.PlayniteApi.Dialogs.SelectString("", "Add Emulator", "Emulator name:");
+            if (result == null || !result.Result || string.IsNullOrWhiteSpace(result.SelectedString))
+                return;
 
             if (_settings.EmulatorProfiles == null)
                 _settings.EmulatorProfiles = new List<EmulatorProfile>();
 
             _settings.EmulatorProfiles.Add(new EmulatorProfile
             {
-                Name        = name,
+                Name        = result.SelectedString.Trim(),
                 Enabled     = true,
                 IsUserAdded = true
             });
