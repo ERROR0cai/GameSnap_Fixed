@@ -10,6 +10,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -26,8 +27,19 @@
 
         <Separator Grid.Row="1" Margin="0,0,0,12"/>
 
+        <!-- Warning when AutoCreateFolders is off -->
+        <Border Grid.Row="1" Margin="0,0,0,8" Padding="10,8"
+                Background="#1a2a1a" BorderBrush="#4caf50" BorderThickness="1" CornerRadius="4"
+                Visibility="{Binding AutoCreateFoldersWarningVisibility}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="💡 " FontSize="13" VerticalAlignment="Center"/>
+                <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#a0d0a0"
+                           Text="Tip: Enable 'Auto-create game folders' in the General tab so folders are created automatically the first time you play a game on an emulator."/>
+            </StackPanel>
+        </Border>
+
         <!-- Emulator list -->
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding Settings.EmulatorProfiles}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
@@ -112,7 +124,7 @@
         </ScrollViewer>
 
         <!-- Add custom emulator -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,12,0,0">
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,12,0,0">
             <Button Content="+ Add emulator"
                     Padding="12,6"
                     Command="{Binding AddEmulatorCommand}"

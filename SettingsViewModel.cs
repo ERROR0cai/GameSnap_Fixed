@@ -61,6 +61,11 @@ namespace GameSnapPlugin
         }
 
         // Additional sources text binding (one per line)
+        public System.Windows.Visibility AutoCreateFoldersWarningVisibility =>
+            _settings.EnableEmulatorSupport && !_settings.AutoCreateFolders
+                ? System.Windows.Visibility.Visible
+                : System.Windows.Visibility.Collapsed;
+
         public string AdditionalSourcesText
         {
             get => string.Join(Environment.NewLine, _settings.AdditionalSourceFolders);

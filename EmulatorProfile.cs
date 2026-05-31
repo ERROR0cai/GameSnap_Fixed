@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Newtonsoft.Json;
 
 namespace GameSnapPlugin
 {
@@ -63,8 +64,10 @@ namespace GameSnapPlugin
 
         // ── Computed display properties ──
 
+        [JsonIgnore]
         public bool IsCustom => !string.IsNullOrEmpty(CustomPath);
 
+        [JsonIgnore]
         public string DisplayPath
         {
             get
@@ -75,6 +78,7 @@ namespace GameSnapPlugin
             }
         }
 
+        [JsonIgnore]
         public string StatusText
         {
             get
@@ -92,9 +96,11 @@ namespace GameSnapPlugin
             }
         }
 
+        [JsonIgnore]
         public string StatusColor =>
             StatusText.StartsWith("✓") ? "#4caf50" : "#f44336";
 
+        [JsonIgnore]
         public string? ResolvedPath
         {
             get

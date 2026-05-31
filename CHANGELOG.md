@@ -5,16 +5,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.3.0] — 2026-05-29
+## [1.3.0] — 2026-05-30
 
 ### Added
 - Screenshot counter in game right-click menu — shows total file count and opens the game folder on click
-- Emulator screenshot support (disabled by default) — auto-detects RetroArch, PCSX2, Dolphin, DuckStation, PPSSPP and Cemu; custom folders configurable for unlisted emulators
+- Emulator screenshot support (disabled by default) — dedicated **Emulators** tab in Settings with per-emulator toggles, auto-detection status and custom path override
+- Built-in support for: RetroArch, PCSX2, Dolphin, RPCS3, Cemu, PPSSPP, mGBA, DuckStation
+- Custom emulator button — add any unlisted emulator with its screenshot folder
+- ROM name cleaning — strips region tags like `(USA)`, `(Rev 1)`, `[!]` before matching to Playnite library
 
 ### Fixed
-- Playnite crash on startup caused by unhandled exceptions in plugin initialization — all critical methods now have defensive try/catch
-- Settings loss on restart — BeginEdit now notifies all bound fields correctly on reload; EndEdit shows an error dialog if save fails
-- New settings fields (CustomEmulatorFolders) being reset after plugin update — added to merge logic in LoadSettings
+- Playnite crash on startup — all critical methods wrapped in try/catch; plugin now falls back to defaults instead of crashing
+- Settings loss on restart — race condition between async startup and settings loader resolved
+- New settings fields now merge correctly with saved data on plugin update
 
 ---
 

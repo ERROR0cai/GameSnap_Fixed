@@ -131,16 +131,30 @@ namespace GameSnapPlugin
                 if (saved.AdditionalSourceFolders == null)
                     saved.AdditionalSourceFolders = defaults.AdditionalSourceFolders;
                 if (saved.EmulatorProfiles == null || saved.EmulatorProfiles.Count == 0)
+                {
                     saved.EmulatorProfiles = defaults.EmulatorProfiles;
+                }
                 else
                 {
-                    // Merge: ensure all built-in emulators exist, preserve user settings
-                    foreach (var builtIn in EmulatorProfile.BuiltInNames)
+                    // Remove accidental duplicates first
+                    var seen = new System.Collections.Generic.HashSet<string>(
+                        StringComparer.OrdinalIgnoreCase);
+                    saved.EmulatorProfiles = saved.EmulatorProfiles
+                        .Where(p => seen.Add(p.Name))
+                        .ToList();
+
+                    // Add any built-in emulator that is missing
+                    for (int bi = 0; bi < EmulatorProfile.BuiltInNames.Length; bi++)
                     {
-                        if (!saved.EmulatorProfiles.Any(p => p.Name == builtIn))
-                            saved.EmulatorProfiles.Insert(
-                                System.Array.IndexOf(EmulatorProfile.BuiltInNames, builtIn),
+                        var builtIn = EmulatorProfile.BuiltInNames[bi];
+                        if (!saved.EmulatorProfiles.Any(p =>
+                            string.Equals(p.Name, builtIn, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            // Insert at correct position among built-ins
+                            int insertAt = Math.Min(bi, saved.EmulatorProfiles.Count);
+                            saved.EmulatorProfiles.Insert(insertAt,
                                 new EmulatorProfile { Name = builtIn, Enabled = false });
+                        }
                     }
                 }
                 if (string.IsNullOrEmpty(saved.UnmatchedFolderName))
@@ -151,11 +165,13 @@ namespace GameSnapPlugin
                     saved.PollingIntervalSeconds = defaults.PollingIntervalSeconds;
 
                 _settings = saved;
+                _logger?.Info($"Settings loaded — Source: '{saved.SourceFolder}' Dest: '{saved.DestinationBase}'");
                 return _settings;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"GameSnap LoadSettings error: {ex.Message}");
+                _logger?.Error($"LoadSettings failed: {ex.Message} — using defaults");
                 _settings = new GameSnapSettings();
                 return _settings;
             }
@@ -167,6 +183,7 @@ namespace GameSnapPlugin
             {
                 _settings = settings;
                 SavePluginSettings(settings);
+                _logger?.Info($"Settings saved — Source: '{settings.SourceFolder}' Dest: '{settings.DestinationBase}'");
             }
             catch (Exception ex)
             {
