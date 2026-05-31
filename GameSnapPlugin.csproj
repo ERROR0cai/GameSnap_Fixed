@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="PlayniteSDK" Version="6.*" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.*" />
   </ItemGroup>
 
   <ItemGroup>
