@@ -22,15 +22,7 @@ namespace GameSnapPlugin
         public GameSnapSettings Settings
         {
             get => _settings;
-            set
-            {
-                _settings = value;
-                OnPropertyChanged();
-                // Force all bound fields to refresh when settings object changes
-                OnPropertyChanged(nameof(ImageExtensionsText));
-                OnPropertyChanged(nameof(VideoExtensionsText));
-                OnPropertyChanged(nameof(AdditionalSourcesText));
-            }
+            set { _settings = value; OnPropertyChanged(); }
         }
 
         // Extensions text bindings
@@ -61,11 +53,6 @@ namespace GameSnapPlugin
         }
 
         // Additional sources text binding (one per line)
-        public System.Windows.Visibility AutoCreateFoldersWarningVisibility =>
-            _settings.EnableEmulatorSupport && !_settings.AutoCreateFolders
-                ? System.Windows.Visibility.Visible
-                : System.Windows.Visibility.Collapsed;
-
         public string AdditionalSourcesText
         {
             get => string.Join(Environment.NewLine, _settings.AdditionalSourceFolders);
@@ -93,13 +80,12 @@ namespace GameSnapPlugin
         public ICommand BrowseSteamCommand       { get; }
         public ICommand OpenDictionaryCommand    { get; }
         public ICommand OpenLogCommand           { get; }
-        public ICommand AddEmulatorCommand       { get; }
-        public ICommand RemoveEmulatorCommand    { get; }
 
         public SettingsViewModel(GameSnapPlugin plugin)
         {
             _plugin   = plugin;
-            _settings = plugin.LoadSettings();
+            // Settings loaded in BeginEdit() — not here — to avoid race conditions
+            _settings = plugin.CurrentSettings ?? new GameSnapSettings();
 
             BrowseSourceCommand      = new RelayCommand(BrowseSource);
             BrowseDestinationCommand = new RelayCommand(BrowseDestination);
@@ -107,8 +93,6 @@ namespace GameSnapPlugin
             BrowseSteamCommand       = new RelayCommand(BrowseSteam);
             OpenDictionaryCommand    = new RelayCommand(OpenDictionary);
             OpenLogCommand           = new RelayCommand(OpenLog);
-            AddEmulatorCommand       = new RelayCommand(AddEmulator);
-            RemoveEmulatorCommand    = new RelayCommand(RemoveEmulator);
         }
 
         public void BeginEdit()
@@ -121,32 +105,30 @@ namespace GameSnapPlugin
             OnPropertyChanged(nameof(ImageExtensionsText));
             OnPropertyChanged(nameof(VideoExtensionsText));
             OnPropertyChanged(nameof(AdditionalSourcesText));
-            OnPropertyChanged(nameof(BackupFolder));
         }
 
         public void CancelEdit()
         {
+            // Restore to pre-edit state without touching plugin._settings
             if (_editingClone != null)
-                Settings = _editingClone;
+            {
+                _settings = _editingClone;
+                OnPropertyChanged(nameof(Settings));
+                OnPropertyChanged(nameof(ImageExtensionsText));
+                OnPropertyChanged(nameof(VideoExtensionsText));
+                OnPropertyChanged(nameof(AdditionalSourcesText));
+            }
         }
 
         public void EndEdit()
         {
-            try
-            {
-                // Sync all text-bound fields back to settings object before saving
-                _settings.ImageExtensions         = ParseExtensions(ImageExtensionsText);
-                _settings.VideoExtensions         = ParseExtensions(VideoExtensionsText);
-                _settings.AdditionalSourceFolders = ParseLines(AdditionalSourcesText);
-    
-                _plugin.SaveSettings(_settings);
-                _plugin.ApplySettings(_settings);
-            }
-            catch (Exception ex)
-            {
-                _plugin.PlayniteApi.Dialogs.ShowErrorMessage(
-                    $"GameSnap failed to save settings:\n{ex.Message}", "GameSnap");
-            }
+            // Force sync of text-bound fields back to the settings object
+            _settings.ImageExtensions       = ParseExtensions(ImageExtensionsText);
+            _settings.VideoExtensions       = ParseExtensions(VideoExtensionsText);
+            _settings.AdditionalSourceFolders = ParseLines(AdditionalSourcesText);
+
+            _plugin.SaveSettings(_settings);
+            _plugin.ApplySettings(_settings);
         }
 
         private static System.Collections.Generic.List<string> ParseExtensions(string text)
@@ -199,43 +181,6 @@ namespace GameSnapPlugin
             if (path != null) { _settings.SteamPath = path; OnPropertyChanged(nameof(Settings)); }
         }
 
-        public string? BrowseForFolder()
-            => _plugin.PlayniteApi.Dialogs.SelectFolder();
-
-        private void AddEmulator()
-        {
-            var result = _plugin.PlayniteApi.Dialogs.SelectString("", "Add Emulator", "Emulator name:");
-            if (result == null || !result.Result || string.IsNullOrWhiteSpace(result.SelectedString))
-                return;
-
-            if (_settings.EmulatorProfiles == null)
-                _settings.EmulatorProfiles = new List<EmulatorProfile>();
-
-            _settings.EmulatorProfiles.Add(new EmulatorProfile
-            {
-                Name        = result.SelectedString.Trim(),
-                Enabled     = true,
-                IsUserAdded = true
-            });
-            OnPropertyChanged(nameof(Settings));
-        }
-
-        private void RemoveEmulator()
-        {
-            if (_settings.EmulatorProfiles == null) return;
-
-            // Remove last user-added emulator
-            for (int i = _settings.EmulatorProfiles.Count - 1; i >= 0; i--)
-            {
-                if (_settings.EmulatorProfiles[i].IsUserAdded)
-                {
-                    _settings.EmulatorProfiles.RemoveAt(i);
-                    OnPropertyChanged(nameof(Settings));
-                    return;
-                }
-            }
-        }
-
         private void OpenDictionary()
         {
             var path = Path.Combine(_plugin.GetPluginUserDataPath(), "dictionary.txt");
@@ -252,13 +197,11 @@ namespace GameSnapPlugin
         {
             var path = Path.Combine(_plugin.GetPluginUserDataPath(), "gamesnap.log");
             if (File.Exists(path))
-            {
                 var psi = new System.Diagnostics.ProcessStartInfo("notepad.exe", path)
-                {
-                    UseShellExecute = true
-                };
-                System.Diagnostics.Process.Start(psi);
-            }
+            {
+                UseShellExecute = true
+            };
+            System.Diagnostics.Process.Start(psi);
             else
                 _plugin.PlayniteApi.Dialogs.ShowMessage("No log file yet.", "GameSnap");
         }
@@ -281,14 +224,6 @@ namespace GameSnapPlugin
             EnableSteamSupport              = src.EnableSteamSupport,
             SteamPath                       = src.SteamPath,
             EnableLocalProviderIntegration  = src.EnableLocalProviderIntegration,
-            EnableEmulatorSupport = src.EnableEmulatorSupport,
-            EmulatorProfiles      = src.EmulatorProfiles?.Select(p => new EmulatorProfile
-            {
-                Name        = p.Name,
-                Enabled     = p.Enabled,
-                CustomPath  = p.CustomPath,
-                IsUserAdded = p.IsUserAdded
-            }).ToList() ?? EmulatorProfile.CreateDefaults(),
             ImageExtensions           = new List<string>(src.ImageExtensions),
             VideoExtensions           = new List<string>(src.VideoExtensions),
             WindowBlacklist           = new List<string>(src.WindowBlacklist),
