@@ -197,11 +197,13 @@ namespace GameSnapPlugin
         {
             var path = Path.Combine(_plugin.GetPluginUserDataPath(), "gamesnap.log");
             if (File.Exists(path))
-                var psi = new System.Diagnostics.ProcessStartInfo("notepad.exe", path)
             {
-                UseShellExecute = true
-            };
-            System.Diagnostics.Process.Start(psi);
+                var psi = new System.Diagnostics.ProcessStartInfo("notepad.exe", path)
+                {
+                    UseShellExecute = true
+                };
+                System.Diagnostics.Process.Start(psi);
+            }
             else
                 _plugin.PlayniteApi.Dialogs.ShowMessage("No log file yet.", "GameSnap");
         }
