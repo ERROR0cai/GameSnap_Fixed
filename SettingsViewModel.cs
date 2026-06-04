@@ -80,6 +80,8 @@ namespace GameSnapPlugin
         public ICommand BrowseSteamCommand       { get; }
         public ICommand OpenDictionaryCommand    { get; }
         public ICommand OpenLogCommand           { get; }
+        public ICommand AddEmulatorCommand       { get; }
+        public ICommand RemoveEmulatorCommand    { get; }
 
         public SettingsViewModel(GameSnapPlugin plugin)
         {
@@ -93,6 +95,8 @@ namespace GameSnapPlugin
             BrowseSteamCommand       = new RelayCommand(BrowseSteam);
             OpenDictionaryCommand    = new RelayCommand(OpenDictionary);
             OpenLogCommand           = new RelayCommand(OpenLog);
+            AddEmulatorCommand       = new RelayCommand(AddEmulator);
+            RemoveEmulatorCommand    = new RelayCommand(RemoveEmulator);
         }
 
         public void BeginEdit()
@@ -155,6 +159,39 @@ namespace GameSnapPlugin
             if (string.IsNullOrWhiteSpace(_settings.DestinationBase))
                 errors.Add("Destination folder is required.");
             return errors.Count == 0;
+        }
+
+        public string? BrowseForFolder()
+            => _plugin.PlayniteApi.Dialogs.SelectFolder();
+
+        private void AddEmulator()
+        {
+            var result = _plugin.PlayniteApi.Dialogs.SelectString("", "Add Emulator", "Emulator name:");
+            if (result == null || !result.Result || string.IsNullOrWhiteSpace(result.SelectedString))
+                return;
+            if (_settings.EmulatorProfiles == null)
+                _settings.EmulatorProfiles = new System.Collections.Generic.List<EmulatorProfile>();
+            _settings.EmulatorProfiles.Add(new EmulatorProfile
+            {
+                Name        = result.SelectedString.Trim(),
+                Enabled     = true,
+                IsUserAdded = true
+            });
+            OnPropertyChanged(nameof(Settings));
+        }
+
+        private void RemoveEmulator()
+        {
+            if (_settings.EmulatorProfiles == null) return;
+            for (int i = _settings.EmulatorProfiles.Count - 1; i >= 0; i--)
+            {
+                if (_settings.EmulatorProfiles[i].IsUserAdded)
+                {
+                    _settings.EmulatorProfiles.RemoveAt(i);
+                    OnPropertyChanged(nameof(Settings));
+                    return;
+                }
+            }
         }
 
         private void BrowseSource()
