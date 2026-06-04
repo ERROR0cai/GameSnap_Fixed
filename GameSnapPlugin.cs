@@ -25,22 +25,34 @@ namespace GameSnapPlugin
         public GameSnapPlugin(IPlayniteAPI api) : base(api)
         {
             Properties = new GenericPluginProperties { HasSettings = true };
+
+            // Load settings synchronously so CurrentSettings is always populated before
+            // Playnite can open the Settings UI.  Service initialisation (watchers, Steam,
+            // etc.) is still deferred to OnApplicationStarted to avoid blocking startup.
+            try
+            {
+                _settings = LoadSettingsWithDefaults();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"GameSnap: failed to load settings in constructor: {ex.Message}");
+                _settings = new GameSnapSettings();
+            }
         }
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            // Run in background so Playnite startup is not blocked
+            // Settings already loaded in constructor — just spin up the heavyweight services
+            // (FileSystemWatcher, Steam scan) off the UI thread.
             System.Threading.Tasks.Task.Run(() =>
             {
                 try
                 {
-                    _settings = LoadPluginSettings<GameSnapSettings>() ?? new GameSnapSettings();
                     InitServices(_settings);
                     _watcher?.Start();
                 }
                 catch (Exception ex)
                 {
-                    // Can't use _logger here as it may not be initialized yet
                     System.Diagnostics.Debug.WriteLine($"GameSnap init error: {ex.Message}");
                 }
             });
@@ -93,9 +105,11 @@ namespace GameSnapPlugin
             => new SettingsViewModel(this);
 
         public override UserControl GetSettingsView(bool firstRunSettings)
-            => new Views.SettingsView();
+            => new Views.SettingsTabView();
 
-        public GameSnapSettings LoadSettings()
+        public GameSnapSettings LoadSettings() => LoadSettingsWithDefaults();
+
+        private GameSnapSettings LoadSettingsWithDefaults()
         {
             var saved    = LoadPluginSettings<GameSnapSettings>();
             var defaults = new GameSnapSettings();
