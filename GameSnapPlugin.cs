@@ -13,8 +13,9 @@ namespace GameSnapPlugin
     {
         public override Guid Id { get; } = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
-        private GameSnapSettings   _settings  = new GameSnapSettings();
-        public  GameSnapSettings   CurrentSettings => _settings;
+        // Instância única do ViewModel — nunca recriada, igual ao padrão Ludusavi
+        private SettingsViewModel  _settingsVm;
+        public  GameSnapSettings   CurrentSettings => _settingsVm?.Settings ?? new GameSnapSettings();
         private GameSnapLogger?    _logger;
         private DictionaryService? _dict;
         private OrganizerService?  _organizer;
@@ -26,29 +27,21 @@ namespace GameSnapPlugin
         {
             Properties = new GenericPluginProperties { HasSettings = true };
 
-            // Load settings synchronously so CurrentSettings is always populated before
-            // Playnite can open the Settings UI.  Service initialisation (watchers, Steam,
-            // etc.) is still deferred to OnApplicationStarted to avoid blocking startup.
-            try
-            {
-                _settings = LoadSettingsWithDefaults();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"GameSnap: failed to load settings in constructor: {ex.Message}");
-                _settings = new GameSnapSettings();
-            }
+            // Cria a instância única do ViewModel — ela carrega as settings
+            // internamente via LoadPluginSettings, exatamente como o Ludusavi faz.
+            // Assim o CurrentSettings já está populado antes do Playnite abrir a UI.
+            _settingsVm = new SettingsViewModel(this);
         }
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            // Settings already loaded in constructor — just spin up the heavyweight services
-            // (FileSystemWatcher, Steam scan) off the UI thread.
+            // Settings já carregadas no construtor; só inicializa serviços pesados em background.
             System.Threading.Tasks.Task.Run(() =>
             {
                 try
                 {
-                    InitServices(_settings);
+                    var s = _settingsVm.Settings;
+                    InitServices(s);
                     _watcher?.Start();
                 }
                 catch (Exception ex)
@@ -81,15 +74,15 @@ namespace GameSnapPlugin
 
         private void TryAutoCreateFolder(string gameName)
         {
-            if (!_settings.AutoCreateFolders) return;
-            if (string.IsNullOrWhiteSpace(_settings.DestinationBase)) return;
-            if (!Directory.Exists(_settings.DestinationBase)) return;
+            if (!_settingsVm.Settings.AutoCreateFolders) return;
+            if (string.IsNullOrWhiteSpace(_settingsVm.Settings.DestinationBase)) return;
+            if (!Directory.Exists(_settingsVm.Settings.DestinationBase)) return;
 
             var invalid    = Path.GetInvalidFileNameChars();
             var folderName = string.Concat(gameName.Split(invalid)).Trim();
             if (string.IsNullOrWhiteSpace(folderName)) return;
 
-            var folderPath = Path.Combine(_settings.DestinationBase, folderName);
+            var folderPath = Path.Combine(_settingsVm.Settings.DestinationBase, folderName);
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);
@@ -102,26 +95,20 @@ namespace GameSnapPlugin
         // ──────────────────────────────────────────────
 
         public override ISettings GetSettings(bool firstRunSettings)
-            => new SettingsViewModel(this);
+            => _settingsVm;  // sempre a mesma instância, nunca new — padrão Ludusavi
 
         public override UserControl GetSettingsView(bool firstRunSettings)
             => new Views.SettingsTabView();
 
-        public GameSnapSettings LoadSettings() => LoadSettingsWithDefaults();
-
-        private GameSnapSettings LoadSettingsWithDefaults()
+        public GameSnapSettings LoadSettings()
         {
             var saved    = LoadPluginSettings<GameSnapSettings>();
             var defaults = new GameSnapSettings();
 
             if (saved == null)
-            {
-                _settings = defaults;
-                return _settings;
-            }
+                return defaults;
 
-            // Merge: preserve saved values, fill new fields with defaults
-            // This ensures settings survive plugin updates that add new options
+            // Merge: preserva valores salvos, preenche novos campos com defaults
             if (saved.ImageExtensions == null || saved.ImageExtensions.Count == 0)
                 saved.ImageExtensions = defaults.ImageExtensions;
             if (saved.VideoExtensions == null || saved.VideoExtensions.Count == 0)
@@ -137,13 +124,11 @@ namespace GameSnapPlugin
             if (saved.PollingIntervalSeconds <= 0)
                 saved.PollingIntervalSeconds = defaults.PollingIntervalSeconds;
 
-            _settings = saved;
-            return _settings;
+            return saved;
         }
 
         public void SaveSettings(GameSnapSettings settings)
         {
-            _settings = settings;
             SavePluginSettings(settings);
         }
 
@@ -278,7 +263,7 @@ namespace GameSnapPlugin
             }
 
             var vm = new ReviewViewModel(
-                PlayniteApi, _settings, _dict, _organizer, _logger);
+                PlayniteApi, _settingsVm.Settings, _dict, _organizer, _logger);
 
             var window = new Views.ReviewWindow(vm);
             vm.SetCloseAction(() => window.Close());
