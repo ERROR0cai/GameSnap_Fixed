@@ -124,6 +124,25 @@ namespace GameSnapPlugin
             if (saved.PollingIntervalSeconds <= 0)
                 saved.PollingIntervalSeconds = defaults.PollingIntervalSeconds;
 
+            // Merge de EmulatorProfiles: preserva perfis salvos, adiciona novos built-ins
+            // que possam ter sido incluidos em versoes mais novas do plugin
+            if (saved.EmulatorProfiles == null || saved.EmulatorProfiles.Count == 0)
+            {
+                saved.EmulatorProfiles = defaults.EmulatorProfiles;
+            }
+            else
+            {
+                // Garante que todos os built-ins existam (usuario pode ter instalado versao
+                // anterior que nao tinha todos os emuladores)
+                var existingNames = new System.Collections.Generic.HashSet<string>(
+                    saved.EmulatorProfiles.Select(p => p.Name));
+                foreach (var def in defaults.EmulatorProfiles)
+                {
+                    if (!existingNames.Contains(def.Name))
+                        saved.EmulatorProfiles.Add(def);
+                }
+            }
+
             return saved;
         }
 

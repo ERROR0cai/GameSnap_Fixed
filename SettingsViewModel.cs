@@ -85,11 +85,9 @@ namespace GameSnapPlugin
 
         public SettingsViewModel(GameSnapPlugin plugin)
         {
-            _plugin = plugin;
-
-            // Carrega settings imediatamente — padrão Ludusavi.
-            // O construtor do ViewModel é responsável pelo Load(), não o plugin.
-            _settings = _plugin.LoadSettings();
+            _plugin   = plugin;
+            // Settings loaded in BeginEdit() — not here — to avoid race conditions
+            _settings = plugin.CurrentSettings ?? new GameSnapSettings();
 
             BrowseSourceCommand      = new RelayCommand(BrowseSource);
             BrowseDestinationCommand = new RelayCommand(BrowseDestination);
@@ -103,31 +101,38 @@ namespace GameSnapPlugin
 
         public void BeginEdit()
         {
-            // Tira um snapshot para poder reverter no CancelEdit
-            _editingClone = CloneSettings(_settings);
-        }
-
-        public void CancelEdit()
-        {
-            // Recarrega do disco — padrão Ludusavi
-            _settings = _plugin.LoadSettings();
-            _editingClone = null;
+            // Always reload from disk when opening settings
+            // This ensures the UI reflects what was actually saved
+            _settings      = _plugin.LoadSettings();
+            _editingClone  = CloneSettings(_settings);
             OnPropertyChanged(nameof(Settings));
             OnPropertyChanged(nameof(ImageExtensionsText));
             OnPropertyChanged(nameof(VideoExtensionsText));
             OnPropertyChanged(nameof(AdditionalSourcesText));
         }
 
+        public void CancelEdit()
+        {
+            // Restore to pre-edit state without touching plugin._settings
+            if (_editingClone != null)
+            {
+                _settings = _editingClone;
+                OnPropertyChanged(nameof(Settings));
+                OnPropertyChanged(nameof(ImageExtensionsText));
+                OnPropertyChanged(nameof(VideoExtensionsText));
+                OnPropertyChanged(nameof(AdditionalSourcesText));
+            }
+        }
+
         public void EndEdit()
         {
-            // Sincroniza campos de texto de volta para o objeto de settings
-            _settings.ImageExtensions         = ParseExtensions(ImageExtensionsText);
-            _settings.VideoExtensions         = ParseExtensions(VideoExtensionsText);
+            // Force sync of text-bound fields back to the settings object
+            _settings.ImageExtensions       = ParseExtensions(ImageExtensionsText);
+            _settings.VideoExtensions       = ParseExtensions(VideoExtensionsText);
             _settings.AdditionalSourceFolders = ParseLines(AdditionalSourcesText);
 
-            _plugin.SaveSettings(_settings);   // persiste no disco
-            _plugin.ApplySettings(_settings);  // reinicia watcher etc.
-            _editingClone = null;
+            _plugin.SaveSettings(_settings);
+            _plugin.ApplySettings(_settings);
         }
 
         private static System.Collections.Generic.List<string> ParseExtensions(string text)
@@ -255,12 +260,24 @@ namespace GameSnapPlugin
             RenamePattern             = src.RenamePattern,
             EnableBackup              = src.EnableBackup,
             BackupFolder              = src.BackupFolder,
-            EnableSteamSupport              = src.EnableSteamSupport,
-            SteamPath                       = src.SteamPath,
-            EnableLocalProviderIntegration  = src.EnableLocalProviderIntegration,
-            ImageExtensions           = new List<string>(src.ImageExtensions),
-            VideoExtensions           = new List<string>(src.VideoExtensions),
-            WindowBlacklist           = new List<string>(src.WindowBlacklist),
+            EnableSteamSupport             = src.EnableSteamSupport,
+            SteamPath                      = src.SteamPath,
+            EnableLocalProviderIntegration = src.EnableLocalProviderIntegration,
+            EnableEmulatorSupport          = src.EnableEmulatorSupport,
+            ImageExtensions  = new List<string>(src.ImageExtensions),
+            VideoExtensions  = new List<string>(src.VideoExtensions),
+            WindowBlacklist  = new List<string>(src.WindowBlacklist),
+
+            // Deep clone de cada perfil — sem isso CustomPath/Enabled nao persistem
+            EmulatorProfiles = src.EmulatorProfiles == null
+                ? EmulatorProfile.CreateDefaults()
+                : src.EmulatorProfiles.Select(p => new EmulatorProfile
+                {
+                    Name        = p.Name,
+                    Enabled     = p.Enabled,
+                    CustomPath  = p.CustomPath,
+                    IsUserAdded = p.IsUserAdded,
+                }).ToList(),
         };
     }
 
