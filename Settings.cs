@@ -9,20 +9,14 @@ using System.Windows.Input;
 
 namespace GameSnapPlugin
 {
-    /// <summary>
-    /// Implementa ISettings diretamente — igual ao padrão Ludusavi.
-    /// O Playnite usa esta instância tanto como modelo de dados quanto como DataContext
-    /// da settings view, então commands e text-bindings vivem aqui também.
-    /// </summary>
     public class GameSnapSettings : ISettings, INotifyPropertyChanged
     {
-        private readonly GameSnapPlugin? _plugin;
+        private readonly GameSnapPlugin? _plugin = null!;
 
         public event PropertyChangedEventHandler? PropertyChanged;
         private void Notify([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-        // Construtor sem parâmetros — obrigatório para LoadPluginSettings<T>()
         public GameSnapSettings() { }
 
         public GameSnapSettings(GameSnapPlugin plugin)
@@ -32,151 +26,70 @@ namespace GameSnapPlugin
             Load();
         }
 
-        // O XAML usa {Binding Settings.X} — esta propriedade retorna this
-        // para manter compatibilidade com os bindings existentes
+        [Newtonsoft.Json.JsonIgnore]
         public GameSnapSettings Settings => this;
 
-        // ── Propriedades salvas no JSON ──────────────────────────────────────────
+        // ── Propriedades ─────────────────────────────────────────────────────────
 
         private string _sourceFolder = "";
-        public string SourceFolder
-        {
-            get => _sourceFolder;
-            set { _sourceFolder = value; Notify(); }
-        }
+        public string SourceFolder { get => _sourceFolder; set { _sourceFolder = value; Notify(); } }
 
         private List<string> _additionalSourceFolders = new List<string>();
-        public List<string> AdditionalSourceFolders
-        {
-            get => _additionalSourceFolders;
-            set { _additionalSourceFolders = value; Notify(); }
-        }
+        public List<string> AdditionalSourceFolders { get => _additionalSourceFolders; set { _additionalSourceFolders = value; Notify(); } }
 
         private string _destinationBase = "";
-        public string DestinationBase
-        {
-            get => _destinationBase;
-            set { _destinationBase = value; Notify(); }
-        }
+        public string DestinationBase { get => _destinationBase; set { _destinationBase = value; Notify(); } }
 
         private int _pollingIntervalSeconds = 30;
-        public int PollingIntervalSeconds
-        {
-            get => _pollingIntervalSeconds;
-            set { _pollingIntervalSeconds = value; Notify(); }
-        }
+        public int PollingIntervalSeconds { get => _pollingIntervalSeconds; set { _pollingIntervalSeconds = value; Notify(); } }
 
         private bool _usePlayniteDetection = true;
-        public bool UsePlayniteDetection
-        {
-            get => _usePlayniteDetection;
-            set { _usePlayniteDetection = value; Notify(); }
-        }
+        public bool UsePlayniteDetection { get => _usePlayniteDetection; set { _usePlayniteDetection = value; Notify(); } }
 
         private bool _useWindowFallback = true;
-        public bool UseWindowFallback
-        {
-            get => _useWindowFallback;
-            set { _useWindowFallback = value; Notify(); }
-        }
+        public bool UseWindowFallback { get => _useWindowFallback; set { _useWindowFallback = value; Notify(); } }
 
         private bool _autoCreateFolders = false;
-        public bool AutoCreateFolders
-        {
-            get => _autoCreateFolders;
-            set { _autoCreateFolders = value; Notify(); }
-        }
+        public bool AutoCreateFolders { get => _autoCreateFolders; set { _autoCreateFolders = value; Notify(); } }
 
         private bool _moveUnmatchedToFolder = false;
-        public bool MoveUnmatchedToFolder
-        {
-            get => _moveUnmatchedToFolder;
-            set { _moveUnmatchedToFolder = value; Notify(); }
-        }
+        public bool MoveUnmatchedToFolder { get => _moveUnmatchedToFolder; set { _moveUnmatchedToFolder = value; Notify(); } }
 
         private string _unmatchedFolderName = "_Unmatched";
-        public string UnmatchedFolderName
-        {
-            get => _unmatchedFolderName;
-            set { _unmatchedFolderName = value; Notify(); }
-        }
+        public string UnmatchedFolderName { get => _unmatchedFolderName; set { _unmatchedFolderName = value; Notify(); } }
 
         private bool _showNotifications = true;
-        public bool ShowNotifications
-        {
-            get => _showNotifications;
-            set { _showNotifications = value; Notify(); }
-        }
+        public bool ShowNotifications { get => _showNotifications; set { _showNotifications = value; Notify(); } }
 
         private string _renamePattern = "{game}_{date}_{time}";
-        public string RenamePattern
-        {
-            get => _renamePattern;
-            set { _renamePattern = value; Notify(); }
-        }
+        public string RenamePattern { get => _renamePattern; set { _renamePattern = value; Notify(); } }
 
         private bool _enableBackup = false;
-        public bool EnableBackup
-        {
-            get => _enableBackup;
-            set { _enableBackup = value; Notify(); }
-        }
+        public bool EnableBackup { get => _enableBackup; set { _enableBackup = value; Notify(); } }
 
         private string _backupFolder = "";
-        public string BackupFolder
-        {
-            get => _backupFolder;
-            set { _backupFolder = value; Notify(); }
-        }
+        public string BackupFolder { get => _backupFolder; set { _backupFolder = value; Notify(); } }
 
         private bool _enableSteamSupport = false;
-        public bool EnableSteamSupport
-        {
-            get => _enableSteamSupport;
-            set { _enableSteamSupport = value; Notify(); }
-        }
+        public bool EnableSteamSupport { get => _enableSteamSupport; set { _enableSteamSupport = value; Notify(); } }
 
         private string _steamPath = "";
-        public string SteamPath
-        {
-            get => _steamPath;
-            set { _steamPath = value; Notify(); }
-        }
+        public string SteamPath { get => _steamPath; set { _steamPath = value; Notify(); } }
 
         private bool _enableLocalProviderIntegration = false;
-        public bool EnableLocalProviderIntegration
-        {
-            get => _enableLocalProviderIntegration;
-            set { _enableLocalProviderIntegration = value; Notify(); }
-        }
+        public bool EnableLocalProviderIntegration { get => _enableLocalProviderIntegration; set { _enableLocalProviderIntegration = value; Notify(); } }
 
         private bool _enableEmulatorSupport = false;
-        public bool EnableEmulatorSupport
-        {
-            get => _enableEmulatorSupport;
-            set { _enableEmulatorSupport = value; Notify(); }
-        }
+        public bool EnableEmulatorSupport { get => _enableEmulatorSupport; set { _enableEmulatorSupport = value; Notify(); } }
 
         private List<EmulatorProfile> _emulatorProfiles = EmulatorProfile.CreateDefaults();
-        public List<EmulatorProfile> EmulatorProfiles
-        {
-            get => _emulatorProfiles;
-            set { _emulatorProfiles = value; Notify(); }
-        }
+        public List<EmulatorProfile> EmulatorProfiles { get => _emulatorProfiles; set { _emulatorProfiles = value; Notify(); } }
 
         private List<string> _imageExtensions = new List<string> { ".png", ".jpg", ".jpeg" };
-        public List<string> ImageExtensions
-        {
-            get => _imageExtensions;
-            set { _imageExtensions = value; Notify(); }
-        }
+        public List<string> ImageExtensions { get => _imageExtensions; set { _imageExtensions = value; Notify(); } }
 
         private List<string> _videoExtensions = new List<string> { ".mp4", ".wmv" };
-        public List<string> VideoExtensions
-        {
-            get => _videoExtensions;
-            set { _videoExtensions = value; Notify(); }
-        }
+        public List<string> VideoExtensions { get => _videoExtensions; set { _videoExtensions = value; Notify(); } }
 
         private List<string> _windowBlacklist = new List<string>
         {
@@ -186,60 +99,32 @@ namespace GameSnapPlugin
             "windows", "desktop", "playnite", "visual studio",
             "code", "powershell", "cmd", "terminal"
         };
-        public List<string> WindowBlacklist
-        {
-            get => _windowBlacklist;
-            set { _windowBlacklist = value; Notify(); }
-        }
+        public List<string> WindowBlacklist { get => _windowBlacklist; set { _windowBlacklist = value; Notify(); } }
 
-        // ── Text bindings para o XAML ────────────────────────────────────────────
+        // ── Text bindings ────────────────────────────────────────────────────────
 
         public string ImageExtensionsText
         {
             get => string.Join(", ", ImageExtensions);
-            set
-            {
-                ImageExtensions = value
-                    .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                    .Select(s => s.Trim().ToLowerInvariant())
-                    .Where(s => s.StartsWith("."))
-                    .ToList();
-                Notify();
-            }
+            set { ImageExtensions = value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim().ToLowerInvariant()).Where(s => s.StartsWith(".")).ToList(); Notify(); }
         }
 
         public string VideoExtensionsText
         {
             get => string.Join(", ", VideoExtensions);
-            set
-            {
-                VideoExtensions = value
-                    .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                    .Select(s => s.Trim().ToLowerInvariant())
-                    .Where(s => s.StartsWith("."))
-                    .ToList();
-                Notify();
-            }
+            set { VideoExtensions = value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim().ToLowerInvariant()).Where(s => s.StartsWith(".")).ToList(); Notify(); }
         }
 
         public string AdditionalSourcesText
         {
             get => string.Join(Environment.NewLine, AdditionalSourceFolders);
-            set
-            {
-                AdditionalSourceFolders = value
-                    .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                    .Select(s => s.Trim())
-                    .Where(s => !string.IsNullOrEmpty(s))
-                    .ToList();
-                Notify();
-            }
+            set { AdditionalSourceFolders = value.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList(); Notify(); }
         }
 
         public System.Windows.Visibility AutoCreateFoldersWarningVisibility
             => AutoCreateFolders ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
 
-        // ── Commands para o XAML ─────────────────────────────────────────────────
+        // ── Commands ─────────────────────────────────────────────────────────────
 
         public ICommand? BrowseSourceCommand      { get; private set; }
         public ICommand? BrowseDestinationCommand { get; private set; }
@@ -252,36 +137,31 @@ namespace GameSnapPlugin
 
         private void InitCommands()
         {
-            BrowseSourceCommand      = new RelayCommand(() => { var p = Browse(); if (p != null) SourceFolder = p; });
-            BrowseDestinationCommand = new RelayCommand(() => { var p = Browse(); if (p != null) DestinationBase = p; });
-            BrowseBackupCommand      = new RelayCommand(() => { var p = Browse(); if (p != null) BackupFolder = p; });
-            BrowseSteamCommand       = new RelayCommand(() => { var p = Browse(); if (p != null) SteamPath = p; });
+            BrowseSourceCommand      = new RelayCommand(() => { var p = Browse(); if (p != null) SourceFolder      = p; });
+            BrowseDestinationCommand = new RelayCommand(() => { var p = Browse(); if (p != null) DestinationBase   = p; });
+            BrowseBackupCommand      = new RelayCommand(() => { var p = Browse(); if (p != null) BackupFolder      = p; });
+            BrowseSteamCommand       = new RelayCommand(() => { var p = Browse(); if (p != null) SteamPath         = p; });
             OpenDictionaryCommand    = new RelayCommand(OpenDictionary);
             OpenLogCommand           = new RelayCommand(OpenLog);
             AddEmulatorCommand       = new RelayCommand(AddEmulator);
             RemoveEmulatorCommand    = new RelayCommand(RemoveEmulator);
         }
 
-        // Método público para EmulatorsView.xaml.cs usar no Browse button
         public string? BrowseForFolder() => Browse();
-
         private string? Browse() => _plugin?.PlayniteApi.Dialogs.SelectFolder();
 
         private void OpenDictionary()
         {
             var path = Path.Combine(_plugin!.GetPluginUserDataPath(), "dictionary.txt");
-            if (!File.Exists(path))
-                File.WriteAllText(path, "# Format:\n# [Game Name]\n# alias1\n");
-            System.Diagnostics.Process.Start(
-                new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
+            if (!File.Exists(path)) File.WriteAllText(path, "# Format:\n# [Game Name]\n# alias1\n");
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
         }
 
         private void OpenLog()
         {
             var path = Path.Combine(_plugin!.GetPluginUserDataPath(), "gamesnap.log");
             if (File.Exists(path))
-                System.Diagnostics.Process.Start(
-                    new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
             else
                 _plugin!.PlayniteApi.Dialogs.ShowMessage("No log file yet.", "GameSnap");
         }
@@ -291,12 +171,7 @@ namespace GameSnapPlugin
             var result = _plugin!.PlayniteApi.Dialogs.SelectString("", "Add Emulator", "Emulator name:");
             if (result == null || !result.Result || string.IsNullOrWhiteSpace(result.SelectedString)) return;
             EmulatorProfiles ??= new List<EmulatorProfile>();
-            EmulatorProfiles.Add(new EmulatorProfile
-            {
-                Name        = result.SelectedString.Trim(),
-                Enabled     = true,
-                IsUserAdded = true
-            });
+            EmulatorProfiles.Add(new EmulatorProfile { Name = result.SelectedString.Trim(), Enabled = true, IsUserAdded = true });
             Notify(nameof(EmulatorProfiles));
         }
 
@@ -304,21 +179,14 @@ namespace GameSnapPlugin
         {
             if (EmulatorProfiles == null) return;
             for (int i = EmulatorProfiles.Count - 1; i >= 0; i--)
-            {
-                if (EmulatorProfiles[i].IsUserAdded)
-                {
-                    EmulatorProfiles.RemoveAt(i);
-                    Notify(nameof(EmulatorProfiles));
-                    return;
-                }
-            }
+                if (EmulatorProfiles[i].IsUserAdded) { EmulatorProfiles.RemoveAt(i); Notify(nameof(EmulatorProfiles)); return; }
         }
 
-        // ── ISettings — padrão Ludusavi ──────────────────────────────────────────
+        // ── ISettings ────────────────────────────────────────────────────────────
 
-        public void BeginEdit() { /* nada — igual ao Ludusavi */ }
+        public void BeginEdit() { }
 
-        public void CancelEdit() => Load(); // recarrega do disco para this
+        public void CancelEdit() => Load();
 
         public void EndEdit()
         {
@@ -329,21 +197,19 @@ namespace GameSnapPlugin
         public bool VerifySettings(out List<string> errors)
         {
             errors = new List<string>();
-            if (string.IsNullOrWhiteSpace(SourceFolder))
-                errors.Add("Source folder is required.");
-            if (string.IsNullOrWhiteSpace(DestinationBase))
-                errors.Add("Destination folder is required.");
+            if (string.IsNullOrWhiteSpace(SourceFolder))   errors.Add("Source folder is required.");
+            if (string.IsNullOrWhiteSpace(DestinationBase)) errors.Add("Destination folder is required.");
             return errors.Count == 0;
         }
 
-        // ── Load — atualiza this campo a campo (nunca substitui this) ────────────
+        // ── Load ─────────────────────────────────────────────────────────────────
 
         private void Load()
         {
             var s = _plugin!.LoadPluginSettings<GameSnapSettings>();
             if (s == null) return;
 
-            if (s.SourceFolder   != null) SourceFolder   = s.SourceFolder;
+            if (s.SourceFolder    != null) SourceFolder    = s.SourceFolder;
             if (s.DestinationBase != null) DestinationBase = s.DestinationBase;
             if (s.PollingIntervalSeconds > 0) PollingIntervalSeconds = s.PollingIntervalSeconds;
 
@@ -362,12 +228,11 @@ namespace GameSnapPlugin
             if (s.BackupFolder        != null) BackupFolder        = s.BackupFolder;
             if (s.SteamPath           != null) SteamPath           = s.SteamPath;
 
-            if (s.ImageExtensions      != null && s.ImageExtensions.Count > 0)  ImageExtensions      = s.ImageExtensions;
-            if (s.VideoExtensions      != null && s.VideoExtensions.Count > 0)  VideoExtensions      = s.VideoExtensions;
-            if (s.WindowBlacklist      != null && s.WindowBlacklist.Count > 0)  WindowBlacklist      = s.WindowBlacklist;
-            if (s.AdditionalSourceFolders != null)                               AdditionalSourceFolders = s.AdditionalSourceFolders;
+            if (s.ImageExtensions         != null && s.ImageExtensions.Count > 0)  ImageExtensions         = s.ImageExtensions;
+            if (s.VideoExtensions         != null && s.VideoExtensions.Count > 0)  VideoExtensions         = s.VideoExtensions;
+            if (s.WindowBlacklist         != null && s.WindowBlacklist.Count > 0)  WindowBlacklist         = s.WindowBlacklist;
+            if (s.AdditionalSourceFolders != null)                                  AdditionalSourceFolders = s.AdditionalSourceFolders;
 
-            // EmulatorProfiles — merge: preserva salvos, adiciona novos built-ins
             if (s.EmulatorProfiles == null || s.EmulatorProfiles.Count == 0)
             {
                 EmulatorProfiles = EmulatorProfile.CreateDefaults();
