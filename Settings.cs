@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Playnite.SDK;
 using System;
 using System.Collections.Generic;
@@ -26,7 +27,7 @@ namespace GameSnapPlugin
             Load();
         }
 
-        [Newtonsoft.Json.JsonIgnore]
+        [JsonIgnore]
         public GameSnapSettings Settings => this;
 
         // ── Propriedades ─────────────────────────────────────────────────────────
