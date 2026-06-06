@@ -15,26 +15,20 @@ namespace GameSnapPlugin
         protected void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-        private readonly GameSnapPlugin    _plugin;
-        private          GameSnapSettings  _settings;
+        private readonly GameSnapPlugin   _plugin;
+        private          GameSnapSettings _settings;
         private          GameSnapSettings? _editingClone;
 
-        public GameSnapSettings Settings
-        {
-            get => _settings;
-            set { _settings = value; OnPropertyChanged(); }
-        }
+        public GameSnapSettings Settings => _settings;
 
-        // Extensions text bindings
+        // ── Text bindings ────────────────────────────────────────────────────────
+
         public string ImageExtensionsText
         {
             get => string.Join(", ", _settings.ImageExtensions);
             set
             {
-                _settings.ImageExtensions = new List<string>(
-                    value.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                         .Select(s => s.Trim().ToLowerInvariant())
-                         .Where(s => s.StartsWith(".")));
+                _settings.ImageExtensions = ParseExtensions(value);
                 OnPropertyChanged();
             }
         }
@@ -44,36 +38,29 @@ namespace GameSnapPlugin
             get => string.Join(", ", _settings.VideoExtensions);
             set
             {
-                _settings.VideoExtensions = new List<string>(
-                    value.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                         .Select(s => s.Trim().ToLowerInvariant())
-                         .Where(s => s.StartsWith(".")));
+                _settings.VideoExtensions = ParseExtensions(value);
                 OnPropertyChanged();
             }
         }
 
-        // Additional sources text binding (one per line)
         public string AdditionalSourcesText
         {
             get => string.Join(Environment.NewLine, _settings.AdditionalSourceFolders);
             set
             {
-                _settings.AdditionalSourceFolders = new List<string>(
-                    value.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                         .Select(s => s.Trim())
-                         .Where(s => !string.IsNullOrEmpty(s)));
+                _settings.AdditionalSourceFolders = ParseLines(value);
                 OnPropertyChanged();
             }
         }
 
-        // Backup folder binding
         public string BackupFolder
         {
             get => _settings.BackupFolder;
             set { _settings.BackupFolder = value; OnPropertyChanged(); }
         }
 
-        // Commands
+        // ── Commands ─────────────────────────────────────────────────────────────
+
         public ICommand BrowseSourceCommand      { get; }
         public ICommand BrowseDestinationCommand { get; }
         public ICommand BrowseBackupCommand      { get; }
@@ -83,11 +70,12 @@ namespace GameSnapPlugin
         public ICommand AddEmulatorCommand       { get; }
         public ICommand RemoveEmulatorCommand    { get; }
 
+        // ── Constructor ──────────────────────────────────────────────────────────
+
         public SettingsViewModel(GameSnapPlugin plugin)
         {
             _plugin   = plugin;
-            // Settings loaded in BeginEdit() — not here — to avoid race conditions
-            _settings = plugin.CurrentSettings ?? new GameSnapSettings();
+            _settings = _plugin.LoadSettings(); // carrega do disco imediatamente
 
             BrowseSourceCommand      = new RelayCommand(BrowseSource);
             BrowseDestinationCommand = new RelayCommand(BrowseDestination);
@@ -99,43 +87,49 @@ namespace GameSnapPlugin
             RemoveEmulatorCommand    = new RelayCommand(RemoveEmulator);
         }
 
+        // ── ISettings ────────────────────────────────────────────────────────────
+
         public void BeginEdit()
         {
-            // Recarrega do disco e atualiza os valores IN-PLACE no _settings existente.
-            // Nunca substituimos a referencia de _settings nem de EmulatorProfiles porque
-            // o WPF faz two-way binding direto nos objetos EmulatorProfile — trocar a lista
-            // quebra os bindings e descarta valores que o usuario acabou de digitar/browsear.
-            var fresh = _plugin.LoadSettings();
-            _settings.SourceFolder              = fresh.SourceFolder;
-            _settings.DestinationBase           = fresh.DestinationBase;
-            _settings.PollingIntervalSeconds    = fresh.PollingIntervalSeconds;
-            _settings.UsePlayniteDetection      = fresh.UsePlayniteDetection;
-            _settings.UseWindowFallback         = fresh.UseWindowFallback;
-            _settings.AutoCreateFolders         = fresh.AutoCreateFolders;
-            _settings.MoveUnmatchedToFolder     = fresh.MoveUnmatchedToFolder;
-            _settings.UnmatchedFolderName       = fresh.UnmatchedFolderName;
-            _settings.ShowNotifications         = fresh.ShowNotifications;
-            _settings.RenamePattern             = fresh.RenamePattern;
-            _settings.EnableBackup              = fresh.EnableBackup;
-            _settings.BackupFolder              = fresh.BackupFolder;
-            _settings.EnableSteamSupport        = fresh.EnableSteamSupport;
-            _settings.SteamPath                 = fresh.SteamPath;
-            _settings.EnableLocalProviderIntegration = fresh.EnableLocalProviderIntegration;
-            _settings.EnableEmulatorSupport     = fresh.EnableEmulatorSupport;
-            _settings.ImageExtensions           = fresh.ImageExtensions;
-            _settings.VideoExtensions           = fresh.VideoExtensions;
-            _settings.AdditionalSourceFolders   = fresh.AdditionalSourceFolders;
-            _settings.WindowBlacklist           = fresh.WindowBlacklist;
+            // Recarrega do disco e atualiza os valores in-place no _settings existente.
+            //
+            // POR QUÊ in-place e não "_settings = fresh"?
+            // A EmulatorsView faz two-way binding (Text="{Binding CustomPath}") direto
+            // nos objetos EmulatorProfile dentro da lista. Se substituirmos a referência
+            // de _settings ou de EmulatorProfiles, o WPF perde o binding e descarta o
+            // que o usuário acabou de digitar/selecionar — por isso atualizamos campo a
+            // campo e item a item, preservando as referências de objeto.
 
-            // Atualiza perfis in-place: preserva a mesma List<> (mantém bindings WPF),
-            // só atualiza Name/Enabled/CustomPath/IsUserAdded de cada item
+            var fresh = _plugin.LoadSettings();
+
+            _settings.SourceFolder                   = fresh.SourceFolder;
+            _settings.DestinationBase                = fresh.DestinationBase;
+            _settings.PollingIntervalSeconds         = fresh.PollingIntervalSeconds;
+            _settings.UsePlayniteDetection           = fresh.UsePlayniteDetection;
+            _settings.UseWindowFallback              = fresh.UseWindowFallback;
+            _settings.AutoCreateFolders              = fresh.AutoCreateFolders;
+            _settings.MoveUnmatchedToFolder          = fresh.MoveUnmatchedToFolder;
+            _settings.UnmatchedFolderName            = fresh.UnmatchedFolderName;
+            _settings.ShowNotifications              = fresh.ShowNotifications;
+            _settings.RenamePattern                  = fresh.RenamePattern;
+            _settings.EnableBackup                   = fresh.EnableBackup;
+            _settings.BackupFolder                   = fresh.BackupFolder;
+            _settings.EnableSteamSupport             = fresh.EnableSteamSupport;
+            _settings.SteamPath                      = fresh.SteamPath;
+            _settings.EnableLocalProviderIntegration = fresh.EnableLocalProviderIntegration;
+            _settings.EnableEmulatorSupport          = fresh.EnableEmulatorSupport;
+            _settings.ImageExtensions                = fresh.ImageExtensions;
+            _settings.VideoExtensions                = fresh.VideoExtensions;
+            _settings.AdditionalSourceFolders        = fresh.AdditionalSourceFolders;
+            _settings.WindowBlacklist                = fresh.WindowBlacklist;
+
+            // Atualiza perfis in-place: limpa e re-adiciona na mesma List<>
+            // para não quebrar o ItemsSource binding da EmulatorsView
+            _settings.EmulatorProfiles ??= new List<EmulatorProfile>();
+            _settings.EmulatorProfiles.Clear();
             if (fresh.EmulatorProfiles != null)
-            {
-                _settings.EmulatorProfiles ??= new System.Collections.Generic.List<EmulatorProfile>();
-                _settings.EmulatorProfiles.Clear();
                 foreach (var p in fresh.EmulatorProfiles)
                     _settings.EmulatorProfiles.Add(p);
-            }
 
             // Snapshot para CancelEdit
             _editingClone = CloneSettings(_settings);
@@ -150,35 +144,33 @@ namespace GameSnapPlugin
         {
             if (_editingClone == null) return;
 
-            // Restaura in-place — mesma logica do BeginEdit, sem trocar a referencia
-            _settings.SourceFolder              = _editingClone.SourceFolder;
-            _settings.DestinationBase           = _editingClone.DestinationBase;
-            _settings.PollingIntervalSeconds    = _editingClone.PollingIntervalSeconds;
-            _settings.UsePlayniteDetection      = _editingClone.UsePlayniteDetection;
-            _settings.UseWindowFallback         = _editingClone.UseWindowFallback;
-            _settings.AutoCreateFolders         = _editingClone.AutoCreateFolders;
-            _settings.MoveUnmatchedToFolder     = _editingClone.MoveUnmatchedToFolder;
-            _settings.UnmatchedFolderName       = _editingClone.UnmatchedFolderName;
-            _settings.ShowNotifications         = _editingClone.ShowNotifications;
-            _settings.RenamePattern             = _editingClone.RenamePattern;
-            _settings.EnableBackup              = _editingClone.EnableBackup;
-            _settings.BackupFolder              = _editingClone.BackupFolder;
-            _settings.EnableSteamSupport        = _editingClone.EnableSteamSupport;
-            _settings.SteamPath                 = _editingClone.SteamPath;
+            // Restaura in-place — mesma lógica do BeginEdit
+            _settings.SourceFolder                   = _editingClone.SourceFolder;
+            _settings.DestinationBase                = _editingClone.DestinationBase;
+            _settings.PollingIntervalSeconds         = _editingClone.PollingIntervalSeconds;
+            _settings.UsePlayniteDetection           = _editingClone.UsePlayniteDetection;
+            _settings.UseWindowFallback              = _editingClone.UseWindowFallback;
+            _settings.AutoCreateFolders              = _editingClone.AutoCreateFolders;
+            _settings.MoveUnmatchedToFolder          = _editingClone.MoveUnmatchedToFolder;
+            _settings.UnmatchedFolderName            = _editingClone.UnmatchedFolderName;
+            _settings.ShowNotifications              = _editingClone.ShowNotifications;
+            _settings.RenamePattern                  = _editingClone.RenamePattern;
+            _settings.EnableBackup                   = _editingClone.EnableBackup;
+            _settings.BackupFolder                   = _editingClone.BackupFolder;
+            _settings.EnableSteamSupport             = _editingClone.EnableSteamSupport;
+            _settings.SteamPath                      = _editingClone.SteamPath;
             _settings.EnableLocalProviderIntegration = _editingClone.EnableLocalProviderIntegration;
-            _settings.EnableEmulatorSupport     = _editingClone.EnableEmulatorSupport;
-            _settings.ImageExtensions           = _editingClone.ImageExtensions;
-            _settings.VideoExtensions           = _editingClone.VideoExtensions;
-            _settings.AdditionalSourceFolders   = _editingClone.AdditionalSourceFolders;
-            _settings.WindowBlacklist           = _editingClone.WindowBlacklist;
+            _settings.EnableEmulatorSupport          = _editingClone.EnableEmulatorSupport;
+            _settings.ImageExtensions                = _editingClone.ImageExtensions;
+            _settings.VideoExtensions                = _editingClone.VideoExtensions;
+            _settings.AdditionalSourceFolders        = _editingClone.AdditionalSourceFolders;
+            _settings.WindowBlacklist                = _editingClone.WindowBlacklist;
 
+            _settings.EmulatorProfiles ??= new List<EmulatorProfile>();
+            _settings.EmulatorProfiles.Clear();
             if (_editingClone.EmulatorProfiles != null)
-            {
-                _settings.EmulatorProfiles ??= new System.Collections.Generic.List<EmulatorProfile>();
-                _settings.EmulatorProfiles.Clear();
                 foreach (var p in _editingClone.EmulatorProfiles)
                     _settings.EmulatorProfiles.Add(p);
-            }
 
             _editingClone = null;
             OnPropertyChanged(nameof(Settings));
@@ -189,30 +181,20 @@ namespace GameSnapPlugin
 
         public void EndEdit()
         {
-            // Sincroniza campos de texto
+            // Sincroniza campos de texto de volta para o modelo
             _settings.ImageExtensions         = ParseExtensions(ImageExtensionsText);
             _settings.VideoExtensions         = ParseExtensions(VideoExtensionsText);
             _settings.AdditionalSourceFolders = ParseLines(AdditionalSourcesText);
 
             _plugin.SaveSettings(_settings);
             _plugin.ApplySettings(_settings);
+            _editingClone = null;
         }
 
-        private static System.Collections.Generic.List<string> ParseExtensions(string text)
-        {
-            return new System.Collections.Generic.List<string>(
-                text.Split(new char[] { ',' }, System.StringSplitOptions.RemoveEmptyEntries)
-                    .Select(s => s.Trim().ToLowerInvariant())
-                    .Where(s => s.StartsWith(".")));
-        }
+        // ── Helpers públicos ─────────────────────────────────────────────────────
 
-        private static System.Collections.Generic.List<string> ParseLines(string text)
-        {
-            return new System.Collections.Generic.List<string>(
-                text.Split(new char[] { '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries)
-                    .Select(s => s.Trim())
-                    .Where(s => !string.IsNullOrEmpty(s)));
-        }
+        public string? BrowseForFolder()
+            => _plugin.PlayniteApi.Dialogs.SelectFolder();
 
         public bool VerifySettings(out List<string> errors)
         {
@@ -224,38 +206,7 @@ namespace GameSnapPlugin
             return errors.Count == 0;
         }
 
-        public string? BrowseForFolder()
-            => _plugin.PlayniteApi.Dialogs.SelectFolder();
-
-        private void AddEmulator()
-        {
-            var result = _plugin.PlayniteApi.Dialogs.SelectString("", "Add Emulator", "Emulator name:");
-            if (result == null || !result.Result || string.IsNullOrWhiteSpace(result.SelectedString))
-                return;
-            if (_settings.EmulatorProfiles == null)
-                _settings.EmulatorProfiles = new System.Collections.Generic.List<EmulatorProfile>();
-            _settings.EmulatorProfiles.Add(new EmulatorProfile
-            {
-                Name        = result.SelectedString.Trim(),
-                Enabled     = true,
-                IsUserAdded = true
-            });
-            OnPropertyChanged(nameof(Settings));
-        }
-
-        private void RemoveEmulator()
-        {
-            if (_settings.EmulatorProfiles == null) return;
-            for (int i = _settings.EmulatorProfiles.Count - 1; i >= 0; i--)
-            {
-                if (_settings.EmulatorProfiles[i].IsUserAdded)
-                {
-                    _settings.EmulatorProfiles.RemoveAt(i);
-                    OnPropertyChanged(nameof(Settings));
-                    return;
-                }
-            }
-        }
+        // ── Comandos de navegação ────────────────────────────────────────────────
 
         private void BrowseSource()
         {
@@ -286,53 +237,76 @@ namespace GameSnapPlugin
             var path = Path.Combine(_plugin.GetPluginUserDataPath(), "dictionary.txt");
             if (!File.Exists(path))
                 File.WriteAllText(path, "# Format:\n# [Game Name]\n# alias1\n");
-            var psi = new System.Diagnostics.ProcessStartInfo("notepad.exe", path)
-            {
-                UseShellExecute = true
-            };
-            System.Diagnostics.Process.Start(psi);
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
         }
 
         private void OpenLog()
         {
             var path = Path.Combine(_plugin.GetPluginUserDataPath(), "gamesnap.log");
             if (File.Exists(path))
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo("notepad.exe", path)
-                {
-                    UseShellExecute = true
-                };
-                System.Diagnostics.Process.Start(psi);
-            }
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
             else
                 _plugin.PlayniteApi.Dialogs.ShowMessage("No log file yet.", "GameSnap");
         }
 
+        // ── Comandos de emulador ─────────────────────────────────────────────────
+
+        private void AddEmulator()
+        {
+            var result = _plugin.PlayniteApi.Dialogs.SelectString("", "Add Emulator", "Emulator name:");
+            if (result == null || !result.Result || string.IsNullOrWhiteSpace(result.SelectedString)) return;
+
+            _settings.EmulatorProfiles ??= new List<EmulatorProfile>();
+            _settings.EmulatorProfiles.Add(new EmulatorProfile
+            {
+                Name        = result.SelectedString.Trim(),
+                Enabled     = true,
+                IsUserAdded = true
+            });
+            OnPropertyChanged(nameof(Settings));
+        }
+
+        private void RemoveEmulator()
+        {
+            if (_settings.EmulatorProfiles == null) return;
+            for (int i = _settings.EmulatorProfiles.Count - 1; i >= 0; i--)
+            {
+                if (_settings.EmulatorProfiles[i].IsUserAdded)
+                {
+                    _settings.EmulatorProfiles.RemoveAt(i);
+                    OnPropertyChanged(nameof(Settings));
+                    return;
+                }
+            }
+        }
+
+        // ── CloneSettings — deep clone completo ──────────────────────────────────
+
         private static GameSnapSettings CloneSettings(GameSnapSettings src) => new GameSnapSettings
         {
-            SourceFolder              = src.SourceFolder,
-            AdditionalSourceFolders   = new List<string>(src.AdditionalSourceFolders),
-            DestinationBase           = src.DestinationBase,
-            PollingIntervalSeconds    = src.PollingIntervalSeconds,
-            UsePlayniteDetection      = src.UsePlayniteDetection,
-            UseWindowFallback         = src.UseWindowFallback,
-            AutoCreateFolders         = src.AutoCreateFolders,
-            MoveUnmatchedToFolder     = src.MoveUnmatchedToFolder,
-            UnmatchedFolderName       = src.UnmatchedFolderName,
-            ShowNotifications         = src.ShowNotifications,
-            RenamePattern             = src.RenamePattern,
-            EnableBackup              = src.EnableBackup,
-            BackupFolder              = src.BackupFolder,
+            SourceFolder                   = src.SourceFolder,
+            DestinationBase                = src.DestinationBase,
+            PollingIntervalSeconds         = src.PollingIntervalSeconds,
+            UsePlayniteDetection           = src.UsePlayniteDetection,
+            UseWindowFallback              = src.UseWindowFallback,
+            AutoCreateFolders              = src.AutoCreateFolders,
+            MoveUnmatchedToFolder          = src.MoveUnmatchedToFolder,
+            UnmatchedFolderName            = src.UnmatchedFolderName,
+            ShowNotifications              = src.ShowNotifications,
+            RenamePattern                  = src.RenamePattern,
+            EnableBackup                   = src.EnableBackup,
+            BackupFolder                   = src.BackupFolder,
             EnableSteamSupport             = src.EnableSteamSupport,
             SteamPath                      = src.SteamPath,
             EnableLocalProviderIntegration = src.EnableLocalProviderIntegration,
             EnableEmulatorSupport          = src.EnableEmulatorSupport,
-            ImageExtensions  = new List<string>(src.ImageExtensions),
-            VideoExtensions  = new List<string>(src.VideoExtensions),
-            WindowBlacklist  = new List<string>(src.WindowBlacklist),
-
-            // Deep clone de cada perfil — sem isso CustomPath/Enabled nao persistem
-            EmulatorProfiles = src.EmulatorProfiles == null
+            AdditionalSourceFolders        = new List<string>(src.AdditionalSourceFolders),
+            ImageExtensions                = new List<string>(src.ImageExtensions),
+            VideoExtensions                = new List<string>(src.VideoExtensions),
+            WindowBlacklist                = new List<string>(src.WindowBlacklist),
+            EmulatorProfiles               = src.EmulatorProfiles == null
                 ? EmulatorProfile.CreateDefaults()
                 : src.EmulatorProfiles.Select(p => new EmulatorProfile
                 {
@@ -342,6 +316,20 @@ namespace GameSnapPlugin
                     IsUserAdded = p.IsUserAdded,
                 }).ToList(),
         };
+
+        // ── Parsers ──────────────────────────────────────────────────────────────
+
+        private static List<string> ParseExtensions(string text)
+            => text.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                   .Select(s => s.Trim().ToLowerInvariant())
+                   .Where(s => s.StartsWith("."))
+                   .ToList();
+
+        private static List<string> ParseLines(string text)
+            => text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                   .Select(s => s.Trim())
+                   .Where(s => !string.IsNullOrEmpty(s))
+                   .ToList();
     }
 
     public class RelayCommand : ICommand

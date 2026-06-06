@@ -14,41 +14,34 @@ namespace GameSnapPlugin
     {
         public override Guid Id { get; } = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
-        // Instância única do ViewModel — nunca recriada, igual ao padrão Ludusavi
+        // Instância única do ViewModel — nunca recriada (padrão Ludusavi)
         private SettingsViewModel  _settingsVm;
-        public  GameSnapSettings   CurrentSettings => _settingsVm?.Settings ?? new GameSnapSettings();
         private GameSnapLogger?    _logger;
         private DictionaryService? _dict;
         private OrganizerService?  _organizer;
         private WatcherService?    _watcher;
-        private SteamService?           _steam;
-        private LocalProviderService?   _localProvider;
+        private SteamService?          _steam;
+        private LocalProviderService?  _localProvider;
+
+        // Atalho para o código interno do plugin
+        private GameSnapSettings S => _settingsVm.Settings;
 
         public GameSnapPlugin(IPlayniteAPI api) : base(api)
         {
             Properties = new GenericPluginProperties { HasSettings = true };
 
-            // Cria a instância única do ViewModel — ela carrega as settings
-            // internamente via LoadPluginSettings, exatamente como o Ludusavi faz.
-            // Assim o CurrentSettings já está populado antes do Playnite abrir a UI.
+            // Cria o ViewModel imediatamente — ele carrega as settings no próprio construtor.
+            // Assim CurrentSettings nunca é vazio quando o Playnite abre a UI.
             _settingsVm = new SettingsViewModel(this);
         }
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            // Settings já carregadas no construtor; só inicializa serviços pesados em background.
+            // Settings já carregadas — só inicializa serviços pesados em background
             System.Threading.Tasks.Task.Run(() =>
             {
-                try
-                {
-                    var s = _settingsVm.Settings;
-                    InitServices(s);
-                    _watcher?.Start();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"GameSnap init error: {ex.Message}");
-                }
+                try   { InitServices(S); _watcher?.Start(); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"GameSnap init error: {ex.Message}"); }
             });
         }
 
@@ -75,15 +68,15 @@ namespace GameSnapPlugin
 
         private void TryAutoCreateFolder(string gameName)
         {
-            if (!_settingsVm.Settings.AutoCreateFolders) return;
-            if (string.IsNullOrWhiteSpace(_settingsVm.Settings.DestinationBase)) return;
-            if (!Directory.Exists(_settingsVm.Settings.DestinationBase)) return;
+            if (!S.AutoCreateFolders) return;
+            if (string.IsNullOrWhiteSpace(S.DestinationBase)) return;
+            if (!Directory.Exists(S.DestinationBase)) return;
 
             var invalid    = Path.GetInvalidFileNameChars();
             var folderName = string.Concat(gameName.Split(invalid)).Trim();
             if (string.IsNullOrWhiteSpace(folderName)) return;
 
-            var folderPath = Path.Combine(_settingsVm.Settings.DestinationBase, folderName);
+            var folderPath = Path.Combine(S.DestinationBase, folderName);
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);
@@ -92,24 +85,23 @@ namespace GameSnapPlugin
         }
 
         // ──────────────────────────────────────────────
-        // Settings
+        // Settings — padrão Ludusavi
         // ──────────────────────────────────────────────
 
-        public override ISettings GetSettings(bool firstRunSettings)
-            => _settingsVm;  // sempre a mesma instância, nunca new — padrão Ludusavi
+        // GetSettings SEMPRE retorna a mesma instância — nunca "new SettingsViewModel"
+        public override ISettings GetSettings(bool firstRunSettings) => _settingsVm;
 
         public override UserControl GetSettingsView(bool firstRunSettings)
             => new Views.SettingsTabView();
 
+        // Carrega do disco com merge de defaults para novos campos
         public GameSnapSettings LoadSettings()
         {
             var saved    = LoadPluginSettings<GameSnapSettings>();
             var defaults = new GameSnapSettings();
 
-            if (saved == null)
-                return defaults;
+            if (saved == null) return defaults;
 
-            // Merge: preserva valores salvos, preenche novos campos com defaults
             if (saved.ImageExtensions == null || saved.ImageExtensions.Count == 0)
                 saved.ImageExtensions = defaults.ImageExtensions;
             if (saved.VideoExtensions == null || saved.VideoExtensions.Count == 0)
@@ -125,41 +117,30 @@ namespace GameSnapPlugin
             if (saved.PollingIntervalSeconds <= 0)
                 saved.PollingIntervalSeconds = defaults.PollingIntervalSeconds;
 
-            // Merge de EmulatorProfiles: preserva perfis salvos, adiciona novos built-ins
-            // que possam ter sido incluidos em versoes mais novas do plugin
+            // Merge EmulatorProfiles: preserva salvos, adiciona built-ins novos
             if (saved.EmulatorProfiles == null || saved.EmulatorProfiles.Count == 0)
             {
                 saved.EmulatorProfiles = defaults.EmulatorProfiles;
             }
             else
             {
-                // Garante que todos os built-ins existam (usuario pode ter instalado versao
-                // anterior que nao tinha todos os emuladores)
-                var existingNames = new System.Collections.Generic.HashSet<string>(
-                    saved.EmulatorProfiles.Select(p => p.Name));
+                var existingNames = new HashSet<string>(saved.EmulatorProfiles.Select(p => p.Name));
                 foreach (var def in defaults.EmulatorProfiles)
-                {
                     if (!existingNames.Contains(def.Name))
                         saved.EmulatorProfiles.Add(def);
-                }
             }
 
             return saved;
         }
 
         public void SaveSettings(GameSnapSettings settings)
-        {
-            SavePluginSettings(settings);
-        }
+            => SavePluginSettings(settings);
 
         public void ApplySettings(GameSnapSettings settings)
         {
-            if (_watcher != null)
-            {
-                _watcher.Stop();
-                _watcher.Dispose();
-                _watcher = null;
-            }
+            _watcher?.Stop();
+            _watcher?.Dispose();
+            _watcher = null;
             InitServices(settings);
             _watcher?.Start();
         }
@@ -177,7 +158,6 @@ namespace GameSnapPlugin
             _dict      = new DictionaryService(dataPath);
             _organizer = new OrganizerService(settings, _dict, _logger);
 
-            // Steam support
             if (settings.EnableSteamSupport)
             {
                 _steam = new SteamService(PlayniteApi, _logger);
@@ -189,7 +169,6 @@ namespace GameSnapPlugin
                 _organizer.SteamService = null;
             }
 
-            // Notificação toast quando arquivos são movidos
             _organizer.OnFileMoved = (title, message) =>
             {
                 if (settings.ShowNotifications)
@@ -202,7 +181,6 @@ namespace GameSnapPlugin
 
             _watcher = new WatcherService(settings, _organizer, _logger);
 
-            // Local Provider integration
             _localProvider = new LocalProviderService(PlayniteApi, _logger);
             if (settings.EnableLocalProviderIntegration && !string.IsNullOrEmpty(settings.DestinationBase))
             {
@@ -240,13 +218,8 @@ namespace GameSnapPlugin
                 {
                     var path = Path.Combine(GetPluginUserDataPath(), "gamesnap.log");
                     if (File.Exists(path))
-                    {
-                        var psi = new System.Diagnostics.ProcessStartInfo("notepad.exe", path)
-                        {
-                            UseShellExecute = true
-                        };
-                        System.Diagnostics.Process.Start(psi);
-                    }
+                        System.Diagnostics.Process.Start(
+                            new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
                 }
             };
 
@@ -259,11 +232,8 @@ namespace GameSnapPlugin
                     var path = Path.Combine(GetPluginUserDataPath(), "dictionary.txt");
                     if (!File.Exists(path))
                         File.WriteAllText(path, "# Format:\n# [Game Name]\n# alias1\n");
-                    var psi = new System.Diagnostics.ProcessStartInfo("notepad.exe", path)
-                    {
-                        UseShellExecute = true
-                    };
-                    System.Diagnostics.Process.Start(psi);
+                    System.Diagnostics.Process.Start(
+                        new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
                 }
             };
 
@@ -274,6 +244,7 @@ namespace GameSnapPlugin
                 Action = _ => OpenReviewWindow()
             };
         }
+
         private void OpenReviewWindow()
         {
             if (_organizer == null || _dict == null || _logger == null)
@@ -281,10 +252,7 @@ namespace GameSnapPlugin
                 PlayniteApi.Dialogs.ShowMessage("GameSnap is not fully initialized.", "GameSnap");
                 return;
             }
-
-            var vm = new ReviewViewModel(
-                PlayniteApi, _settingsVm.Settings, _dict, _organizer, _logger);
-
+            var vm     = new ReviewViewModel(PlayniteApi, S, _dict, _organizer, _logger);
             var window = new Views.ReviewWindow(vm);
             vm.SetCloseAction(() => window.Close());
             window.ShowDialog();
