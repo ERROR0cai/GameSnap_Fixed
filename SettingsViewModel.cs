@@ -101,10 +101,45 @@ namespace GameSnapPlugin
 
         public void BeginEdit()
         {
-            // Always reload from disk when opening settings
-            // This ensures the UI reflects what was actually saved
-            _settings      = _plugin.LoadSettings();
-            _editingClone  = CloneSettings(_settings);
+            // Recarrega do disco e atualiza os valores IN-PLACE no _settings existente.
+            // Nunca substituimos a referencia de _settings nem de EmulatorProfiles porque
+            // o WPF faz two-way binding direto nos objetos EmulatorProfile — trocar a lista
+            // quebra os bindings e descarta valores que o usuario acabou de digitar/browsear.
+            var fresh = _plugin.LoadSettings();
+            _settings.SourceFolder              = fresh.SourceFolder;
+            _settings.DestinationBase           = fresh.DestinationBase;
+            _settings.PollingIntervalSeconds    = fresh.PollingIntervalSeconds;
+            _settings.UsePlayniteDetection      = fresh.UsePlayniteDetection;
+            _settings.UseWindowFallback         = fresh.UseWindowFallback;
+            _settings.AutoCreateFolders         = fresh.AutoCreateFolders;
+            _settings.MoveUnmatchedToFolder     = fresh.MoveUnmatchedToFolder;
+            _settings.UnmatchedFolderName       = fresh.UnmatchedFolderName;
+            _settings.ShowNotifications         = fresh.ShowNotifications;
+            _settings.RenamePattern             = fresh.RenamePattern;
+            _settings.EnableBackup              = fresh.EnableBackup;
+            _settings.BackupFolder              = fresh.BackupFolder;
+            _settings.EnableSteamSupport        = fresh.EnableSteamSupport;
+            _settings.SteamPath                 = fresh.SteamPath;
+            _settings.EnableLocalProviderIntegration = fresh.EnableLocalProviderIntegration;
+            _settings.EnableEmulatorSupport     = fresh.EnableEmulatorSupport;
+            _settings.ImageExtensions           = fresh.ImageExtensions;
+            _settings.VideoExtensions           = fresh.VideoExtensions;
+            _settings.AdditionalSourceFolders   = fresh.AdditionalSourceFolders;
+            _settings.WindowBlacklist           = fresh.WindowBlacklist;
+
+            // Atualiza perfis in-place: preserva a mesma List<> (mantém bindings WPF),
+            // só atualiza Name/Enabled/CustomPath/IsUserAdded de cada item
+            if (fresh.EmulatorProfiles != null)
+            {
+                _settings.EmulatorProfiles ??= new System.Collections.Generic.List<EmulatorProfile>();
+                _settings.EmulatorProfiles.Clear();
+                foreach (var p in fresh.EmulatorProfiles)
+                    _settings.EmulatorProfiles.Add(p);
+            }
+
+            // Snapshot para CancelEdit
+            _editingClone = CloneSettings(_settings);
+
             OnPropertyChanged(nameof(Settings));
             OnPropertyChanged(nameof(ImageExtensionsText));
             OnPropertyChanged(nameof(VideoExtensionsText));
@@ -113,22 +148,50 @@ namespace GameSnapPlugin
 
         public void CancelEdit()
         {
-            // Restore to pre-edit state without touching plugin._settings
-            if (_editingClone != null)
+            if (_editingClone == null) return;
+
+            // Restaura in-place — mesma logica do BeginEdit, sem trocar a referencia
+            _settings.SourceFolder              = _editingClone.SourceFolder;
+            _settings.DestinationBase           = _editingClone.DestinationBase;
+            _settings.PollingIntervalSeconds    = _editingClone.PollingIntervalSeconds;
+            _settings.UsePlayniteDetection      = _editingClone.UsePlayniteDetection;
+            _settings.UseWindowFallback         = _editingClone.UseWindowFallback;
+            _settings.AutoCreateFolders         = _editingClone.AutoCreateFolders;
+            _settings.MoveUnmatchedToFolder     = _editingClone.MoveUnmatchedToFolder;
+            _settings.UnmatchedFolderName       = _editingClone.UnmatchedFolderName;
+            _settings.ShowNotifications         = _editingClone.ShowNotifications;
+            _settings.RenamePattern             = _editingClone.RenamePattern;
+            _settings.EnableBackup              = _editingClone.EnableBackup;
+            _settings.BackupFolder              = _editingClone.BackupFolder;
+            _settings.EnableSteamSupport        = _editingClone.EnableSteamSupport;
+            _settings.SteamPath                 = _editingClone.SteamPath;
+            _settings.EnableLocalProviderIntegration = _editingClone.EnableLocalProviderIntegration;
+            _settings.EnableEmulatorSupport     = _editingClone.EnableEmulatorSupport;
+            _settings.ImageExtensions           = _editingClone.ImageExtensions;
+            _settings.VideoExtensions           = _editingClone.VideoExtensions;
+            _settings.AdditionalSourceFolders   = _editingClone.AdditionalSourceFolders;
+            _settings.WindowBlacklist           = _editingClone.WindowBlacklist;
+
+            if (_editingClone.EmulatorProfiles != null)
             {
-                _settings = _editingClone;
-                OnPropertyChanged(nameof(Settings));
-                OnPropertyChanged(nameof(ImageExtensionsText));
-                OnPropertyChanged(nameof(VideoExtensionsText));
-                OnPropertyChanged(nameof(AdditionalSourcesText));
+                _settings.EmulatorProfiles ??= new System.Collections.Generic.List<EmulatorProfile>();
+                _settings.EmulatorProfiles.Clear();
+                foreach (var p in _editingClone.EmulatorProfiles)
+                    _settings.EmulatorProfiles.Add(p);
             }
+
+            _editingClone = null;
+            OnPropertyChanged(nameof(Settings));
+            OnPropertyChanged(nameof(ImageExtensionsText));
+            OnPropertyChanged(nameof(VideoExtensionsText));
+            OnPropertyChanged(nameof(AdditionalSourcesText));
         }
 
         public void EndEdit()
         {
-            // Force sync of text-bound fields back to the settings object
-            _settings.ImageExtensions       = ParseExtensions(ImageExtensionsText);
-            _settings.VideoExtensions       = ParseExtensions(VideoExtensionsText);
+            // Sincroniza campos de texto
+            _settings.ImageExtensions         = ParseExtensions(ImageExtensionsText);
+            _settings.VideoExtensions         = ParseExtensions(VideoExtensionsText);
             _settings.AdditionalSourceFolders = ParseLines(AdditionalSourcesText);
 
             _plugin.SaveSettings(_settings);
