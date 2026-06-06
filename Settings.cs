@@ -2,30 +2,41 @@ using Playnite.SDK;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
 
 namespace GameSnapPlugin
 {
+    /// <summary>
+    /// Implementa ISettings diretamente — igual ao padrão Ludusavi.
+    /// O Playnite usa esta instância tanto como modelo de dados quanto como DataContext
+    /// da settings view, então commands e text-bindings vivem aqui também.
+    /// </summary>
     public class GameSnapSettings : ISettings, INotifyPropertyChanged
     {
-        // Referência ao plugin — necessária para Load/Save (igual ao Ludusavi)
-        private readonly GameSnapPlugin _plugin;
+        private readonly GameSnapPlugin? _plugin;
 
         public event PropertyChangedEventHandler? PropertyChanged;
         private void Notify([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-        // Construtor sem parâmetros obrigatório para LoadPluginSettings<T>()
+        // Construtor sem parâmetros — obrigatório para LoadPluginSettings<T>()
         public GameSnapSettings() { }
 
         public GameSnapSettings(GameSnapPlugin plugin)
         {
             _plugin = plugin;
+            InitCommands();
             Load();
         }
 
-        // ── Campos com notificação (WPF two-way binding funciona em this) ────────
+        // O XAML usa {Binding Settings.X} — esta propriedade retorna this
+        // para manter compatibilidade com os bindings existentes
+        public GameSnapSettings Settings => this;
+
+        // ── Propriedades salvas no JSON ──────────────────────────────────────────
 
         private string _sourceFolder = "";
         public string SourceFolder
@@ -181,24 +192,138 @@ namespace GameSnapPlugin
             set { _windowBlacklist = value; Notify(); }
         }
 
+        // ── Text bindings para o XAML ────────────────────────────────────────────
+
+        public string ImageExtensionsText
+        {
+            get => string.Join(", ", ImageExtensions);
+            set
+            {
+                ImageExtensions = value
+                    .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim().ToLowerInvariant())
+                    .Where(s => s.StartsWith("."))
+                    .ToList();
+                Notify();
+            }
+        }
+
+        public string VideoExtensionsText
+        {
+            get => string.Join(", ", VideoExtensions);
+            set
+            {
+                VideoExtensions = value
+                    .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim().ToLowerInvariant())
+                    .Where(s => s.StartsWith("."))
+                    .ToList();
+                Notify();
+            }
+        }
+
+        public string AdditionalSourcesText
+        {
+            get => string.Join(Environment.NewLine, AdditionalSourceFolders);
+            set
+            {
+                AdditionalSourceFolders = value
+                    .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim())
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .ToList();
+                Notify();
+            }
+        }
+
+        public System.Windows.Visibility AutoCreateFoldersWarningVisibility
+            => AutoCreateFolders ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+
+        // ── Commands para o XAML ─────────────────────────────────────────────────
+
+        public ICommand? BrowseSourceCommand      { get; private set; }
+        public ICommand? BrowseDestinationCommand { get; private set; }
+        public ICommand? BrowseBackupCommand      { get; private set; }
+        public ICommand? BrowseSteamCommand       { get; private set; }
+        public ICommand? OpenDictionaryCommand    { get; private set; }
+        public ICommand? OpenLogCommand           { get; private set; }
+        public ICommand? AddEmulatorCommand       { get; private set; }
+        public ICommand? RemoveEmulatorCommand    { get; private set; }
+
+        private void InitCommands()
+        {
+            BrowseSourceCommand      = new RelayCommand(() => { var p = Browse(); if (p != null) SourceFolder = p; });
+            BrowseDestinationCommand = new RelayCommand(() => { var p = Browse(); if (p != null) DestinationBase = p; });
+            BrowseBackupCommand      = new RelayCommand(() => { var p = Browse(); if (p != null) BackupFolder = p; });
+            BrowseSteamCommand       = new RelayCommand(() => { var p = Browse(); if (p != null) SteamPath = p; });
+            OpenDictionaryCommand    = new RelayCommand(OpenDictionary);
+            OpenLogCommand           = new RelayCommand(OpenLog);
+            AddEmulatorCommand       = new RelayCommand(AddEmulator);
+            RemoveEmulatorCommand    = new RelayCommand(RemoveEmulator);
+        }
+
+        // Método público para EmulatorsView.xaml.cs usar no Browse button
+        public string? BrowseForFolder() => Browse();
+
+        private string? Browse() => _plugin?.PlayniteApi.Dialogs.SelectFolder();
+
+        private void OpenDictionary()
+        {
+            var path = Path.Combine(_plugin!.GetPluginUserDataPath(), "dictionary.txt");
+            if (!File.Exists(path))
+                File.WriteAllText(path, "# Format:\n# [Game Name]\n# alias1\n");
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
+        }
+
+        private void OpenLog()
+        {
+            var path = Path.Combine(_plugin!.GetPluginUserDataPath(), "gamesnap.log");
+            if (File.Exists(path))
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
+            else
+                _plugin!.PlayniteApi.Dialogs.ShowMessage("No log file yet.", "GameSnap");
+        }
+
+        private void AddEmulator()
+        {
+            var result = _plugin!.PlayniteApi.Dialogs.SelectString("", "Add Emulator", "Emulator name:");
+            if (result == null || !result.Result || string.IsNullOrWhiteSpace(result.SelectedString)) return;
+            EmulatorProfiles ??= new List<EmulatorProfile>();
+            EmulatorProfiles.Add(new EmulatorProfile
+            {
+                Name        = result.SelectedString.Trim(),
+                Enabled     = true,
+                IsUserAdded = true
+            });
+            Notify(nameof(EmulatorProfiles));
+        }
+
+        private void RemoveEmulator()
+        {
+            if (EmulatorProfiles == null) return;
+            for (int i = EmulatorProfiles.Count - 1; i >= 0; i--)
+            {
+                if (EmulatorProfiles[i].IsUserAdded)
+                {
+                    EmulatorProfiles.RemoveAt(i);
+                    Notify(nameof(EmulatorProfiles));
+                    return;
+                }
+            }
+        }
+
         // ── ISettings — padrão Ludusavi ──────────────────────────────────────────
 
-        public void BeginEdit()
-        {
-            // Nada — igual ao Ludusavi. Os valores já estão em this.
-        }
+        public void BeginEdit() { /* nada — igual ao Ludusavi */ }
 
-        public void CancelEdit()
-        {
-            // Recarrega do disco para this — igual ao Ludusavi
-            Load();
-        }
+        public void CancelEdit() => Load(); // recarrega do disco para this
 
         public void EndEdit()
         {
-            // Salva this no disco — igual ao Ludusavi
-            _plugin.SavePluginSettings(this);
-            _plugin.ApplySettings(this);
+            _plugin!.SavePluginSettings(this);
+            _plugin!.ApplySettings(this);
         }
 
         public bool VerifySettings(out List<string> errors)
@@ -215,36 +340,32 @@ namespace GameSnapPlugin
 
         private void Load()
         {
-            var s = _plugin.LoadPluginSettings<GameSnapSettings>();
+            var s = _plugin!.LoadPluginSettings<GameSnapSettings>();
             if (s == null) return;
 
-            // Escalares
-            if (s.SourceFolder != null)         SourceFolder         = s.SourceFolder;
-            if (s.DestinationBase != null)       DestinationBase      = s.DestinationBase;
-            if (s.PollingIntervalSeconds > 0)    PollingIntervalSeconds = s.PollingIntervalSeconds;
+            if (s.SourceFolder   != null) SourceFolder   = s.SourceFolder;
+            if (s.DestinationBase != null) DestinationBase = s.DestinationBase;
+            if (s.PollingIntervalSeconds > 0) PollingIntervalSeconds = s.PollingIntervalSeconds;
+
             UsePlayniteDetection           = s.UsePlayniteDetection;
             UseWindowFallback              = s.UseWindowFallback;
             AutoCreateFolders              = s.AutoCreateFolders;
             MoveUnmatchedToFolder          = s.MoveUnmatchedToFolder;
-            if (s.UnmatchedFolderName != null)   UnmatchedFolderName  = s.UnmatchedFolderName;
             ShowNotifications              = s.ShowNotifications;
-            if (s.RenamePattern != null)         RenamePattern        = s.RenamePattern;
             EnableBackup                   = s.EnableBackup;
-            if (s.BackupFolder != null)          BackupFolder         = s.BackupFolder;
             EnableSteamSupport             = s.EnableSteamSupport;
-            if (s.SteamPath != null)             SteamPath            = s.SteamPath;
             EnableLocalProviderIntegration = s.EnableLocalProviderIntegration;
             EnableEmulatorSupport          = s.EnableEmulatorSupport;
 
-            // Listas
-            if (s.ImageExtensions != null && s.ImageExtensions.Count > 0)
-                ImageExtensions = s.ImageExtensions;
-            if (s.VideoExtensions != null && s.VideoExtensions.Count > 0)
-                VideoExtensions = s.VideoExtensions;
-            if (s.WindowBlacklist != null && s.WindowBlacklist.Count > 0)
-                WindowBlacklist = s.WindowBlacklist;
-            if (s.AdditionalSourceFolders != null)
-                AdditionalSourceFolders = s.AdditionalSourceFolders;
+            if (s.UnmatchedFolderName != null) UnmatchedFolderName = s.UnmatchedFolderName;
+            if (s.RenamePattern       != null) RenamePattern       = s.RenamePattern;
+            if (s.BackupFolder        != null) BackupFolder        = s.BackupFolder;
+            if (s.SteamPath           != null) SteamPath           = s.SteamPath;
+
+            if (s.ImageExtensions      != null && s.ImageExtensions.Count > 0)  ImageExtensions      = s.ImageExtensions;
+            if (s.VideoExtensions      != null && s.VideoExtensions.Count > 0)  VideoExtensions      = s.VideoExtensions;
+            if (s.WindowBlacklist      != null && s.WindowBlacklist.Count > 0)  WindowBlacklist      = s.WindowBlacklist;
+            if (s.AdditionalSourceFolders != null)                               AdditionalSourceFolders = s.AdditionalSourceFolders;
 
             // EmulatorProfiles — merge: preserva salvos, adiciona novos built-ins
             if (s.EmulatorProfiles == null || s.EmulatorProfiles.Count == 0)
@@ -260,5 +381,14 @@ namespace GameSnapPlugin
                 EmulatorProfiles = s.EmulatorProfiles;
             }
         }
+    }
+
+    public class RelayCommand : ICommand
+    {
+        private readonly Action _execute;
+        public RelayCommand(Action execute) => _execute = execute;
+        public event EventHandler? CanExecuteChanged;
+        public bool CanExecute(object? parameter) => true;
+        public void Execute(object? parameter) => _execute();
     }
 }
