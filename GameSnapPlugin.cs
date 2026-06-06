@@ -5,7 +5,6 @@ using Playnite.SDK.Plugins;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Windows.Controls;
 
 namespace GameSnapPlugin
@@ -14,33 +13,28 @@ namespace GameSnapPlugin
     {
         public override Guid Id { get; } = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
-        // Instância única do ViewModel — nunca recriada (padrão Ludusavi)
-        private SettingsViewModel  _settingsVm;
-        private GameSnapLogger?    _logger;
-        private DictionaryService? _dict;
-        private OrganizerService?  _organizer;
-        private WatcherService?    _watcher;
-        private SteamService?          _steam;
-        private LocalProviderService?  _localProvider;
+        // Igual ao Ludusavi: settings é público e é a instância ISettings
+        public GameSnapSettings settings { get; private set; }
 
-        // Atalho para o código interno do plugin
-        private GameSnapSettings S => _settingsVm.Settings;
+        private GameSnapLogger?       _logger;
+        private DictionaryService?    _dict;
+        private OrganizerService?     _organizer;
+        private WatcherService?       _watcher;
+        private SteamService?         _steam;
+        private LocalProviderService? _localProvider;
 
         public GameSnapPlugin(IPlayniteAPI api) : base(api)
         {
             Properties = new GenericPluginProperties { HasSettings = true };
-
-            // Cria o ViewModel imediatamente — ele carrega as settings no próprio construtor.
-            // Assim CurrentSettings nunca é vazio quando o Playnite abre a UI.
-            _settingsVm = new SettingsViewModel(this);
+            // Igual ao Ludusavi: cria settings no construtor — já faz Load() internamente
+            settings = new GameSnapSettings(this);
         }
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            // Settings já carregadas — só inicializa serviços pesados em background
             System.Threading.Tasks.Task.Run(() =>
             {
-                try   { InitServices(S); _watcher?.Start(); }
+                try   { InitServices(settings); _watcher?.Start(); }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"GameSnap init error: {ex.Message}"); }
             });
         }
@@ -62,21 +56,16 @@ namespace GameSnapPlugin
             _organizer?.SetCurrentGame(null);
         }
 
-        // ──────────────────────────────────────────────
-        // Auto-create folder
-        // ──────────────────────────────────────────────
-
         private void TryAutoCreateFolder(string gameName)
         {
-            if (!S.AutoCreateFolders) return;
-            if (string.IsNullOrWhiteSpace(S.DestinationBase)) return;
-            if (!Directory.Exists(S.DestinationBase)) return;
+            if (!settings.AutoCreateFolders) return;
+            if (string.IsNullOrWhiteSpace(settings.DestinationBase)) return;
+            if (!Directory.Exists(settings.DestinationBase)) return;
 
-            var invalid    = Path.GetInvalidFileNameChars();
-            var folderName = string.Concat(gameName.Split(invalid)).Trim();
+            var folderName = string.Concat(gameName.Split(Path.GetInvalidFileNameChars())).Trim();
             if (string.IsNullOrWhiteSpace(folderName)) return;
 
-            var folderPath = Path.Combine(S.DestinationBase, folderName);
+            var folderPath = Path.Combine(settings.DestinationBase, folderName);
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);
@@ -84,81 +73,35 @@ namespace GameSnapPlugin
             }
         }
 
-        // ──────────────────────────────────────────────
-        // Settings — padrão Ludusavi
-        // ──────────────────────────────────────────────
+        // ── Settings — igual ao Ludusavi ─────────────────────────────────────────
 
-        // GetSettings SEMPRE retorna a mesma instância — nunca "new SettingsViewModel"
-        public override ISettings GetSettings(bool firstRunSettings) => _settingsVm;
+        // GetSettings retorna a instância única de settings (que implementa ISettings)
+        public override ISettings GetSettings(bool firstRunSettings) => settings;
 
         public override UserControl GetSettingsView(bool firstRunSettings)
             => new Views.SettingsTabView();
 
-        // Carrega do disco com merge de defaults para novos campos
-        public GameSnapSettings LoadSettings()
-        {
-            var saved    = LoadPluginSettings<GameSnapSettings>();
-            var defaults = new GameSnapSettings();
-
-            if (saved == null) return defaults;
-
-            if (saved.ImageExtensions == null || saved.ImageExtensions.Count == 0)
-                saved.ImageExtensions = defaults.ImageExtensions;
-            if (saved.VideoExtensions == null || saved.VideoExtensions.Count == 0)
-                saved.VideoExtensions = defaults.VideoExtensions;
-            if (saved.WindowBlacklist == null || saved.WindowBlacklist.Count == 0)
-                saved.WindowBlacklist = defaults.WindowBlacklist;
-            if (saved.AdditionalSourceFolders == null)
-                saved.AdditionalSourceFolders = defaults.AdditionalSourceFolders;
-            if (string.IsNullOrEmpty(saved.UnmatchedFolderName))
-                saved.UnmatchedFolderName = defaults.UnmatchedFolderName;
-            if (string.IsNullOrEmpty(saved.RenamePattern))
-                saved.RenamePattern = defaults.RenamePattern;
-            if (saved.PollingIntervalSeconds <= 0)
-                saved.PollingIntervalSeconds = defaults.PollingIntervalSeconds;
-
-            // Merge EmulatorProfiles: preserva salvos, adiciona built-ins novos
-            if (saved.EmulatorProfiles == null || saved.EmulatorProfiles.Count == 0)
-            {
-                saved.EmulatorProfiles = defaults.EmulatorProfiles;
-            }
-            else
-            {
-                var existingNames = new HashSet<string>(saved.EmulatorProfiles.Select(p => p.Name));
-                foreach (var def in defaults.EmulatorProfiles)
-                    if (!existingNames.Contains(def.Name))
-                        saved.EmulatorProfiles.Add(def);
-            }
-
-            return saved;
-        }
-
-        public void SaveSettings(GameSnapSettings settings)
-            => SavePluginSettings(settings);
-
-        public void ApplySettings(GameSnapSettings settings)
+        public void ApplySettings(GameSnapSettings s)
         {
             _watcher?.Stop();
             _watcher?.Dispose();
             _watcher = null;
-            InitServices(settings);
+            InitServices(s);
             _watcher?.Start();
         }
 
-        // ──────────────────────────────────────────────
-        // Helpers
-        // ──────────────────────────────────────────────
+        // ── Helpers ──────────────────────────────────────────────────────────────
 
-        private void InitServices(GameSnapSettings settings)
+        private void InitServices(GameSnapSettings s)
         {
             var dataPath = GetPluginUserDataPath();
             Directory.CreateDirectory(dataPath);
 
             _logger    = new GameSnapLogger(dataPath);
             _dict      = new DictionaryService(dataPath);
-            _organizer = new OrganizerService(settings, _dict, _logger);
+            _organizer = new OrganizerService(s, _dict, _logger);
 
-            if (settings.EnableSteamSupport)
+            if (s.EnableSteamSupport)
             {
                 _steam = new SteamService(PlayniteApi, _logger);
                 _organizer.SteamService = _steam;
@@ -171,21 +114,18 @@ namespace GameSnapPlugin
 
             _organizer.OnFileMoved = (title, message) =>
             {
-                if (settings.ShowNotifications)
+                if (s.ShowNotifications)
                     PlayniteApi.Notifications.Add(
-                        new NotificationMessage(
-                            Guid.NewGuid().ToString(),
-                            message,
-                            NotificationType.Info));
+                        new NotificationMessage(Guid.NewGuid().ToString(), message, NotificationType.Info));
             };
 
-            _watcher = new WatcherService(settings, _organizer, _logger);
+            _watcher = new WatcherService(s, _organizer, _logger);
 
             _localProvider = new LocalProviderService(PlayniteApi, _logger);
-            if (settings.EnableLocalProviderIntegration && !string.IsNullOrEmpty(settings.DestinationBase))
+            if (s.EnableLocalProviderIntegration && !string.IsNullOrEmpty(s.DestinationBase))
             {
                 if (_localProvider.IsInstalled())
-                    _localProvider.RegisterDestinationFolder(settings.DestinationBase);
+                    _localProvider.RegisterDestinationFolder(s.DestinationBase);
                 else
                     _logger.Info("Local Provider: not installed, skipping registration.");
             }
@@ -209,7 +149,6 @@ namespace GameSnapPlugin
                 MenuSection = "@GameSnap",
                 Action = _ => _organizer?.Organize()
             };
-
             yield return new MainMenuItem
             {
                 Description = "Open log",
@@ -222,7 +161,6 @@ namespace GameSnapPlugin
                             new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
                 }
             };
-
             yield return new MainMenuItem
             {
                 Description = "Open dictionary",
@@ -236,7 +174,6 @@ namespace GameSnapPlugin
                         new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
                 }
             };
-
             yield return new MainMenuItem
             {
                 Description = "Review unmatched screenshots",
@@ -252,7 +189,7 @@ namespace GameSnapPlugin
                 PlayniteApi.Dialogs.ShowMessage("GameSnap is not fully initialized.", "GameSnap");
                 return;
             }
-            var vm     = new ReviewViewModel(PlayniteApi, S, _dict, _organizer, _logger);
+            var vm     = new ReviewViewModel(PlayniteApi, settings, _dict, _organizer, _logger);
             var window = new Views.ReviewWindow(vm);
             vm.SetCloseAction(() => window.Close());
             window.ShowDialog();
