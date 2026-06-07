@@ -1,4 +1,3 @@
-
 using Playnite.SDK;
 using System;
 using System.Collections.Generic;
@@ -6,6 +5,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Collections.ObjectModel;
 using System.Windows.Input;
 
 namespace GameSnapPlugin
@@ -27,7 +27,7 @@ namespace GameSnapPlugin
             Load();
         }
 
-        [System.Runtime.Serialization.IgnoreDataMember]
+        [Newtonsoft.Json.JsonIgnore]
         public GameSnapSettings Settings => this;
 
         // ── Propriedades ─────────────────────────────────────────────────────────
@@ -83,8 +83,8 @@ namespace GameSnapPlugin
         private bool _enableEmulatorSupport = false;
         public bool EnableEmulatorSupport { get => _enableEmulatorSupport; set { _enableEmulatorSupport = value; Notify(); } }
 
-        private List<EmulatorProfile> _emulatorProfiles = EmulatorProfile.CreateDefaults();
-        public List<EmulatorProfile> EmulatorProfiles { get => _emulatorProfiles; set { _emulatorProfiles = value; Notify(); } }
+        private ObservableCollection<EmulatorProfile> _emulatorProfiles = new ObservableCollection<EmulatorProfile>(EmulatorProfile.CreateDefaults());
+        public ObservableCollection<EmulatorProfile> EmulatorProfiles { get => _emulatorProfiles; set { _emulatorProfiles = value; Notify(); } }
 
         private List<string> _imageExtensions = new List<string> { ".png", ".jpg", ".jpeg" };
         public List<string> ImageExtensions { get => _imageExtensions; set { _imageExtensions = value; Notify(); } }
@@ -171,7 +171,6 @@ namespace GameSnapPlugin
         {
             var result = _plugin!.PlayniteApi.Dialogs.SelectString("", "Add Emulator", "Emulator name:");
             if (result == null || !result.Result || string.IsNullOrWhiteSpace(result.SelectedString)) return;
-            EmulatorProfiles ??= new List<EmulatorProfile>();
             EmulatorProfiles.Add(new EmulatorProfile { Name = result.SelectedString.Trim(), Enabled = true, IsUserAdded = true });
             Notify(nameof(EmulatorProfiles));
         }
@@ -236,7 +235,7 @@ namespace GameSnapPlugin
 
             if (s.EmulatorProfiles == null || s.EmulatorProfiles.Count == 0)
             {
-                EmulatorProfiles = EmulatorProfile.CreateDefaults();
+                EmulatorProfiles = new ObservableCollection<EmulatorProfile>(EmulatorProfile.CreateDefaults());
             }
             else
             {
@@ -244,7 +243,7 @@ namespace GameSnapPlugin
                 foreach (var def in EmulatorProfile.CreateDefaults())
                     if (!existingNames.Contains(def.Name))
                         s.EmulatorProfiles.Add(def);
-                EmulatorProfiles = s.EmulatorProfiles;
+                EmulatorProfiles = new ObservableCollection<EmulatorProfile>(s.EmulatorProfiles);
             }
         }
     }

@@ -1,12 +1,15 @@
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Runtime.Serialization;
 
 namespace GameSnapPlugin
 {
     public class EmulatorProfile : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? name = null)
+        private void Notify([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
         public static readonly string[] BuiltInNames =
@@ -15,55 +18,45 @@ namespace GameSnapPlugin
             "Cemu", "PPSSPP", "mGBA", "DuckStation"
         };
 
-        public static System.Collections.Generic.List<EmulatorProfile> CreateDefaults()
+        public static List<EmulatorProfile> CreateDefaults()
         {
-            var list = new System.Collections.Generic.List<EmulatorProfile>();
+            var list = new List<EmulatorProfile>();
             foreach (var name in BuiltInNames)
                 list.Add(new EmulatorProfile { Name = name, Enabled = false });
             return list;
         }
 
-        private bool   _enabled;
-        private string _name       = "";
-        private string _customPath = "";
+        // ── Propriedades persistidas no JSON ─────────────────────────────────────
 
+        private string _name = "";
         public string Name
         {
             get => _name;
-            set { _name = value; OnPropertyChanged(); OnPropertyChanged(nameof(DisplayPath)); OnPropertyChanged(nameof(StatusText)); OnPropertyChanged(nameof(StatusColor)); }
+            set { _name = value; Notify(); NotifyComputed(); }
         }
 
+        private bool _enabled;
         public bool Enabled
         {
             get => _enabled;
-            set { _enabled = value; OnPropertyChanged(); }
+            set { _enabled = value; Notify(); }
         }
 
+        private string _customPath = "";
         public string CustomPath
         {
             get => _customPath;
-            set
-            {
-                _customPath = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(DisplayPath));
-                OnPropertyChanged(nameof(StatusText));
-                OnPropertyChanged(nameof(StatusColor));
-                OnPropertyChanged(nameof(IsCustom));
-                OnPropertyChanged(nameof(ResolvedPath));
-            }
+            set { _customPath = value; Notify(); NotifyComputed(); }
         }
 
         public bool IsUserAdded { get; set; } = false;
 
-        // ── Computed properties with empty setters so JSON deserialization never fails ──
+        // ── Propriedades computed — NÃO persistidas no JSON ──────────────────────
 
-        public bool IsCustom
-        {
-            get => !string.IsNullOrEmpty(CustomPath);
-            set { } // computed — setter intentionally empty, required for JSON compatibility
-        }
+        [IgnoreDataMember]
+        public bool IsCustom => !string.IsNullOrEmpty(CustomPath);
 
+        [IgnoreDataMember]
         public string DisplayPath
         {
             get
@@ -72,9 +65,9 @@ namespace GameSnapPlugin
                 var auto = EmulatorService.GetDefaultFolder(Name);
                 return auto ?? "(auto)";
             }
-            set { } // computed
         }
 
+        [IgnoreDataMember]
         public string StatusText
         {
             get
@@ -85,15 +78,12 @@ namespace GameSnapPlugin
                 if (auto == null) return "✗ Not found";
                 return System.IO.Directory.Exists(auto) ? "✓ Detected" : "✗ Not found";
             }
-            set { } // computed
         }
 
-        public string StatusColor
-        {
-            get => StatusText.StartsWith("✓") ? "#4caf50" : "#f44336";
-            set { } // computed
-        }
+        [IgnoreDataMember]
+        public string StatusColor => StatusText.StartsWith("✓") ? "#4caf50" : "#f44336";
 
+        [IgnoreDataMember]
         public string? ResolvedPath
         {
             get
@@ -103,7 +93,15 @@ namespace GameSnapPlugin
                 var auto = EmulatorService.GetDefaultFolder(Name);
                 return auto != null && System.IO.Directory.Exists(auto) ? auto : null;
             }
-            set { } // computed
+        }
+
+        private void NotifyComputed()
+        {
+            Notify(nameof(IsCustom));
+            Notify(nameof(DisplayPath));
+            Notify(nameof(StatusText));
+            Notify(nameof(StatusColor));
+            Notify(nameof(ResolvedPath));
         }
     }
 }
