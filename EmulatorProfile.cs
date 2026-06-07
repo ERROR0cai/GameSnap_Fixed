@@ -73,15 +73,15 @@ namespace GameSnapPlugin
             get
             {
                 if (!string.IsNullOrEmpty(CustomPath))
-                    return System.IO.Directory.Exists(CustomPath) ? "✓ Custom" : "✗ Not found";
+                    return System.IO.Directory.Exists(CustomPath) ? "OK Custom" : "X Not found";
                 var auto = EmulatorService.GetDefaultFolder(Name);
-                if (auto == null) return "✗ Not found";
-                return System.IO.Directory.Exists(auto) ? "✓ Detected" : "✗ Not found";
+                if (auto == null) return "X Not found";
+                return System.IO.Directory.Exists(auto) ? "OK Detected" : "X Not found";
             }
         }
 
         [IgnoreDataMember]
-        public string StatusColor => StatusText.StartsWith("✓") ? "#4caf50" : "#f44336";
+        public string StatusColor => StatusText.StartsWith("OK") ? "#4caf50" : "#f44336";
 
         [IgnoreDataMember]
         public string? ResolvedPath
