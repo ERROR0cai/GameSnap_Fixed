@@ -31,7 +31,7 @@ namespace GameSnapPlugin.Views
 
             {
 
-                var settings = DataContext as GameSnapSettings;
+                var settings = DataContext as GameSnapSettingsViewModel;
 
                 var path = settings?.BrowseForFolder();
 

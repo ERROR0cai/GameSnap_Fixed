@@ -13,8 +13,11 @@ namespace GameSnapPlugin
     {
         public override Guid Id { get; } = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
 
-        // Igual ao Ludusavi: settings é público e é a instância ISettings
-        public GameSnapSettings settings { get; private set; }
+        // ViewModel é público — igual ao ScreenshotsVisualizer (PluginSettings)
+        public GameSnapSettingsViewModel PluginSettings { get; private set; }
+
+        // Atalho para os dados — usado internamente
+        private GameSnapSettings S => PluginSettings.Settings;
 
         private GameSnapLogger?       _logger;
         private DictionaryService?    _dict;
@@ -26,15 +29,14 @@ namespace GameSnapPlugin
         public GameSnapPlugin(IPlayniteAPI api) : base(api)
         {
             Properties = new GenericPluginProperties { HasSettings = true };
-            // Igual ao Ludusavi: cria settings no construtor — já faz Load() internamente
-            settings = new GameSnapSettings(this);
+            PluginSettings = new GameSnapSettingsViewModel(this);
         }
 
         public override void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
             System.Threading.Tasks.Task.Run(() =>
             {
-                try   { InitServices(settings); _watcher?.Start(); }
+                try   { InitServices(S); _watcher?.Start(); }
                 catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"GameSnap init error: {ex.Message}"); }
             });
         }
@@ -58,14 +60,14 @@ namespace GameSnapPlugin
 
         private void TryAutoCreateFolder(string gameName)
         {
-            if (!settings.AutoCreateFolders) return;
-            if (string.IsNullOrWhiteSpace(settings.DestinationBase)) return;
-            if (!Directory.Exists(settings.DestinationBase)) return;
+            if (!S.AutoCreateFolders) return;
+            if (string.IsNullOrWhiteSpace(S.DestinationBase)) return;
+            if (!Directory.Exists(S.DestinationBase)) return;
 
             var folderName = string.Concat(gameName.Split(Path.GetInvalidFileNameChars())).Trim();
             if (string.IsNullOrWhiteSpace(folderName)) return;
 
-            var folderPath = Path.Combine(settings.DestinationBase, folderName);
+            var folderPath = Path.Combine(S.DestinationBase, folderName);
             if (!Directory.Exists(folderPath))
             {
                 Directory.CreateDirectory(folderPath);
@@ -73,10 +75,8 @@ namespace GameSnapPlugin
             }
         }
 
-        // ── Settings — igual ao Ludusavi ─────────────────────────────────────────
-
-        // GetSettings retorna a instância única de settings (que implementa ISettings)
-        public override ISettings GetSettings(bool firstRunSettings) => settings;
+        // GetSettings retorna o ViewModel — igual ao ScreenshotsVisualizer
+        public override ISettings GetSettings(bool firstRunSettings) => PluginSettings;
 
         public override UserControl GetSettingsView(bool firstRunSettings)
             => new Views.SettingsTabView();
@@ -89,8 +89,6 @@ namespace GameSnapPlugin
             InitServices(s);
             _watcher?.Start();
         }
-
-        // ── Helpers ──────────────────────────────────────────────────────────────
 
         private void InitServices(GameSnapSettings s)
         {
@@ -189,7 +187,7 @@ namespace GameSnapPlugin
                 PlayniteApi.Dialogs.ShowMessage("GameSnap is not fully initialized.", "GameSnap");
                 return;
             }
-            var vm     = new ReviewViewModel(PlayniteApi, settings, _dict, _organizer, _logger);
+            var vm     = new ReviewViewModel(PlayniteApi, S, _dict, _organizer, _logger);
             var window = new Views.ReviewWindow(vm);
             vm.SetCloseAction(() => window.Close());
             window.ShowDialog();
