@@ -11,7 +11,7 @@ namespace GameSnapPlugin
 {
     public class GameSnapPlugin : GenericPlugin
     {
-        public override Guid Id { get; } = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+        public override Guid Id { get; } = Guid.Parse("1826881c-4e6e-4ed3-ac6c-8605f953daf4");
 
         // ViewModel é público — igual ao ScreenshotsVisualizer (PluginSettings)
         public GameSnapSettingsViewModel PluginSettings { get; private set; }
