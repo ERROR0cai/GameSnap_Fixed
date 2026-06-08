@@ -31,7 +31,7 @@ namespace GameSnapPlugin
         public string SteamPath                    { get; set; } = "";
         public bool EnableLocalProviderIntegration { get; set; } = false;
         public bool EnableEmulatorSupport          { get; set; } = false;
-        public ObservableCollection<EmulatorProfile> EmulatorProfiles { get; set; } = new ObservableCollection<EmulatorProfile>(EmulatorProfile.CreateDefaults());
+        public List<EmulatorProfile> EmulatorProfiles { get; set; } = EmulatorProfile.CreateDefaults();
         public List<string> ImageExtensions        { get; set; } = new List<string> { ".png", ".jpg", ".jpeg" };
         public List<string> VideoExtensions        { get; set; } = new List<string> { ".mp4", ".wmv" };
         public List<string> WindowBlacklist        { get; set; } = new List<string>
@@ -55,40 +55,75 @@ namespace GameSnapPlugin
         private GameSnapSettings _settings;
         public GameSnapSettings Settings { get => _settings; set => SetValue(ref _settings, value); }
 
+        // ObservableCollection separada para binding do ItemsControl
+        private ObservableCollection<EmulatorProfile> _emulatorProfiles = new ObservableCollection<EmulatorProfile>();
+        public ObservableCollection<EmulatorProfile> EmulatorProfiles
+        {
+            get => _emulatorProfiles;
+            set => SetValue(ref _emulatorProfiles, value);
+        }
+
+        private void SyncProfilesFromSettings()
+        {
+            EmulatorProfiles = new ObservableCollection<EmulatorProfile>(
+                Settings.EmulatorProfiles ?? EmulatorProfile.CreateDefaults());
+        }
+
+        private void SyncProfilesToSettings()
+        {
+            Settings.EmulatorProfiles = EmulatorProfiles.ToList();
+        }
+
         public GameSnapSettingsViewModel(GameSnapPlugin plugin)
         {
             _plugin = plugin;
             var saved = plugin.LoadPluginSettings<GameSnapSettings>();
-            Settings = saved ?? new GameSnapSettings();
 
-            // Merge: adiciona built-ins novos que nao existiam em versoes anteriores
-            if (Settings.EmulatorProfiles == null || Settings.EmulatorProfiles.Count == 0)
+            if (saved == null)
             {
-                Settings.EmulatorProfiles = new ObservableCollection<EmulatorProfile>(EmulatorProfile.CreateDefaults());
+                // Primeira execucao — usa defaults
+                Settings = new GameSnapSettings();
             }
             else
             {
-                var existingNames = new HashSet<string>(Settings.EmulatorProfiles.Select(p => p.Name));
-                foreach (var def in EmulatorProfile.CreateDefaults())
-                    if (!existingNames.Contains(def.Name))
-                        Settings.EmulatorProfiles.Add(def);
+                Settings = saved;
+
+                // Converte para ObservableCollection (JSON desserializa como List)
+                if (Settings.EmulatorProfiles == null || Settings.EmulatorProfiles.Count == 0)
+                {
+                    Settings.EmulatorProfiles = EmulatorProfile.CreateDefaults();
+                }
+                else
+                {
+                    // Adiciona apenas built-ins que nao existem ainda (novos emuladores em versoes futuras)
+                    // Nao adiciona nada se o nome ja existe — evita duplicatas
+                    var existing = new ObservableCollection<EmulatorProfile>(Settings.EmulatorProfiles);
+                    var existingNames = new HashSet<string>(existing.Select(p => p.Name));
+                    foreach (var def in EmulatorProfile.CreateDefaults())
+                        if (!existingNames.Contains(def.Name))
+                            existing.Add(def);
+                    Settings.EmulatorProfiles = existing.ToList();
+                }
             }
+            SyncProfilesFromSettings();
         }
 
         // ISettings — igual ao ScreenshotsVisualizer
         public void BeginEdit()
         {
-            // Serialization.GetClone faz deep clone via JSON — igual ao ScreenshotsVisualizer
             _editingClone = Serialization.GetClone(Settings);
         }
 
         public void CancelEdit()
         {
+            if (_editingClone == null) return;
             Settings = _editingClone;
+            SyncProfilesFromSettings();
         }
 
         public void EndEdit()
         {
+            SyncProfilesToSettings();
             _plugin.SavePluginSettings(Settings);
             _plugin.ApplySettings(Settings);
         }
@@ -196,23 +231,20 @@ namespace GameSnapPlugin
         {
             var result = _plugin.PlayniteApi.Dialogs.SelectString("", "Add Emulator", "Emulator name:");
             if (result == null || !result.Result || string.IsNullOrWhiteSpace(result.SelectedString)) return;
-            Settings.EmulatorProfiles.Add(new EmulatorProfile
+            EmulatorProfiles.Add(new EmulatorProfile
             {
                 Name        = result.SelectedString.Trim(),
                 Enabled     = true,
                 IsUserAdded = true
             });
-            OnPropertyChanged(nameof(Settings));
         });
 
         public RelayCommand<object> RemoveEmulatorCommand => new RelayCommand<object>((a) =>
         {
-            if (Settings.EmulatorProfiles == null) return;
-            for (int i = Settings.EmulatorProfiles.Count - 1; i >= 0; i--)
-                if (Settings.EmulatorProfiles[i].IsUserAdded)
+            for (int i = EmulatorProfiles.Count - 1; i >= 0; i--)
+                if (EmulatorProfiles[i].IsUserAdded)
                 {
-                    Settings.EmulatorProfiles.RemoveAt(i);
-                    OnPropertyChanged(nameof(Settings));
+                    EmulatorProfiles.RemoveAt(i);
                     return;
                 }
         });
