@@ -5,6 +5,8 @@ using Playnite.SDK.Plugins;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Windows.Controls;
 
 namespace GameSnapPlugin
@@ -13,18 +15,17 @@ namespace GameSnapPlugin
     {
         public override Guid Id { get; } = Guid.Parse("1826881c-4e6e-4ed3-ac6c-8605f953daf4");
 
-        // ViewModel é público — igual ao ScreenshotsVisualizer (PluginSettings)
-        public GameSnapSettingsViewModel PluginSettings { get; private set; }
+        // ScreenshotsVisualizer GUID — usado para o refresh automático
+        private static readonly Guid ScreenshotsVisualizerId = Guid.Parse("c6c8276f-91bf-48e5-a1d1-4bee0b493488");
 
-        // Atalho para os dados — usado internamente
+        public GameSnapSettingsViewModel PluginSettings { get; private set; }
         private GameSnapSettings S => PluginSettings.Settings;
 
-        private GameSnapLogger?       _logger;
-        private DictionaryService?    _dict;
-        private OrganizerService?     _organizer;
-        private WatcherService?       _watcher;
-        private SteamService?         _steam;
-        private LocalProviderService? _localProvider;
+        private GameSnapLogger?    _logger;
+        private DictionaryService? _dict;
+        private OrganizerService?  _organizer;
+        private WatcherService?    _watcher;
+        private SteamService?      _steam;
 
         public GameSnapPlugin(IPlayniteAPI api) : base(api)
         {
@@ -75,7 +76,42 @@ namespace GameSnapPlugin
             }
         }
 
-        // GetSettings retorna o ViewModel — igual ao ScreenshotsVisualizer
+        // ── ScreenshotsVisualizer integration ───────────────────────────────────
+
+        // Notifica o ScreenshotsVisualizer para reescanear um jogo após mover screenshots.
+        // Usa reflexão para não criar dependência direta no projeto.
+        public void NotifyScreenshotsVisualizerRefresh(Game game)
+        {
+            try
+            {
+                var sv = PlayniteApi.Addons.Plugins
+                    .FirstOrDefault(p => p.Id == ScreenshotsVisualizerId);
+                if (sv == null) return;
+
+                // Acessa Database.RefreshData(Game) via reflexão
+                var dbProp = sv.GetType().GetProperty("Database",
+                    BindingFlags.Public | BindingFlags.Instance);
+                if (dbProp == null) return;
+
+                var db = dbProp.GetValue(sv);
+                if (db == null) return;
+
+                var refreshMethod = db.GetType().GetMethod("RefreshData",
+                    BindingFlags.Public | BindingFlags.Instance,
+                    null, new[] { typeof(Game) }, null);
+
+                refreshMethod?.Invoke(db, new object[] { game });
+                _logger?.Info($"ScreenshotsVisualizer refreshed for: {game.Name}");
+            }
+            catch (Exception ex)
+            {
+                // Silencioso — SV pode não estar instalado
+                _logger?.Info($"ScreenshotsVisualizer refresh skipped: {ex.Message}");
+            }
+        }
+
+        // ── Settings ─────────────────────────────────────────────────────────────
+
         public override ISettings GetSettings(bool firstRunSettings) => PluginSettings;
 
         public override UserControl GetSettingsView(bool firstRunSettings)
@@ -89,6 +125,8 @@ namespace GameSnapPlugin
             InitServices(s);
             _watcher?.Start();
         }
+
+        // ── Services ─────────────────────────────────────────────────────────────
 
         private void InitServices(GameSnapSettings s)
         {
@@ -110,24 +148,23 @@ namespace GameSnapPlugin
                 _organizer.SteamService = null;
             }
 
-            _organizer.OnFileMoved = (title, message) =>
+            _organizer.OnFileMoved = (gameName, message) =>
             {
                 if (s.ShowNotifications)
                     PlayniteApi.Notifications.Add(
                         new NotificationMessage(Guid.NewGuid().ToString(), message, NotificationType.Info));
+
+                // Notifica o ScreenshotsVisualizer para reescanear o jogo
+                var game = PlayniteApi.Database.Games
+                    .FirstOrDefault(g => g.Name.Equals(gameName, StringComparison.OrdinalIgnoreCase));
+                if (game != null)
+                    NotifyScreenshotsVisualizerRefresh(game);
             };
 
             _watcher = new WatcherService(s, _organizer, _logger);
-
-            _localProvider = new LocalProviderService(PlayniteApi, _logger);
-            if (s.EnableLocalProviderIntegration && !string.IsNullOrEmpty(s.DestinationBase))
-            {
-                if (_localProvider.IsInstalled())
-                    _localProvider.RegisterDestinationFolder(s.DestinationBase);
-                else
-                    _logger.Info("Local Provider: not installed, skipping registration.");
-            }
         }
+
+        // ── Menus ─────────────────────────────────────────────────────────────────
 
         public override IEnumerable<GameMenuItem> GetGameMenuItems(GetGameMenuItemsArgs args)
         {

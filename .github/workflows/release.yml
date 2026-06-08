@@ -37,8 +37,9 @@ jobs:
           Rename-Item -Path "tmp.zip" -NewName $pextName
           echo "PEXT_NAME=$pextName" >> $env:GITHUB_OUTPUT
 
-      - name: Publicar Release no GitHub
+      - name: Publicar Release no GitHub (rascunho)
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.pext.outputs.PEXT_NAME }}
           generate_release_notes: true
+          draft: true

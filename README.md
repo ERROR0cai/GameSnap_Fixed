@@ -20,7 +20,7 @@ GameSnap watches a single "drop folder" where all your screenshots land, regardl
 1. Checks the **dictionary** for a known alias → moves to the matching game folder
 2. Falls back to **Playnite's currently running game** → moves and learns the alias for next time
 3. Falls back to the **active window title** → moves and logs the detection
-4. If nothing matches → **logs and ignores** so you can review and rename later
+4. If nothing matches → moves to `_Unmatched` folder for manual review
 
 Everything runs natively inside Playnite — no background `.ps1` scripts, no `.vbs` launchers, no manual setup in the Scripts tab.
 
@@ -62,8 +62,6 @@ Point your capture tool's output to a single folder, for example `C:\Captures\`.
 
 **ShareX:** Task Settings → File naming → Override Screenshots Folder per hotkey
 
-Any other tool that lets you set an output folder will work the same way.
-
 ### Step 2 — Configure GameSnap
 
 In Playnite, go to **Add-ons → GameSnap → Settings** and fill in:
@@ -74,36 +72,60 @@ In Playnite, go to **Add-ons → GameSnap → Settings** and fill in:
 | Destination base | The parent folder that contains your per-game subfolders |
 | Use Playnite detection | Recommended — identifies the game while it's running |
 | Use active window fallback | Secondary detection when no game is active in Playnite |
-| Polling interval | Backup scan in seconds (in addition to the real-time file watcher) |
-| Auto-create game folders | Automatically creates a subfolder when a new game is played (disabled by default) |
+| Auto-create game folders | Automatically creates a subfolder when a new game is played |
 
 ### Step 3 — Create your game folders
 
 Inside the destination base, create one subfolder per game:
 
 ```
-Captures\
+ScreenShots\
 ├── Cyberpunk 2077\
 ├── Elden Ring\
 ├── Celeste\
 └── ...
 ```
 
-GameSnap will match screenshots to these folders automatically.
+> **Tip:** Enable **Auto-create game folders** in Settings to have GameSnap create these automatically whenever you start a game for the first time.
 
-> **Tip:** Enable **Auto-create game folders** in Settings to have GameSnap create these folders automatically whenever you start a game for the first time. This replaces the need for a separate plugin like ScreenshotsVisualizer just for folder creation.
+---
+
+## Works great with ScreenshotsVisualizer
+
+GameSnap pairs naturally with [ScreenshotsVisualizer](https://github.com/Lacro59/playnite-screenshotsvisualizer-plugin). They serve different purposes:
+
+- **GameSnap** organizes screenshots into per-game folders automatically
+- **ScreenshotsVisualizer** displays and browses those screenshots inside Playnite
+
+When both are installed, GameSnap automatically notifies ScreenshotsVisualizer to refresh whenever a screenshot is moved — so your screenshots appear instantly in the viewer without any manual refresh.
+
+### Suggested ScreenshotsVisualizer configuration
+
+In ScreenshotsVisualizer settings, set the **Global screenshots path** to:
+
+```
+H:\Your\ScreenShots\Destination\{Name}
+```
+
+Replace `H:\Your\ScreenShots\Destination\` with your GameSnap **Destination base** folder. The `{Name}` token is resolved automatically by ScreenshotsVisualizer to the game name, matching the subfolders GameSnap creates.
+
+This single setting covers your entire library without configuring each game individually.
+
+---
+
+## Emulator support
+
+GameSnap can monitor screenshot folders from emulators and organize them alongside your PC game screenshots. Enable it in **Settings → Emulators**.
+
+Supported out of the box: RetroArch, PCSX2, Dolphin, RPCS3, Cemu, PPSSPP, mGBA, DuckStation.
+
+Custom emulators can be added with the **+ Add emulator** button.
 
 ---
 
 ## Dictionary
 
-The dictionary lets you map any filename prefix or alias to a game folder. It lives at:
-
-```
-%AppData%\Playnite\ExtensionsData\<plugin-id>\dictionary.txt
-```
-
-You can open it directly from **Add-ons → GameSnap → Settings → Open dictionary.txt**.
+The dictionary lets you map any filename prefix or alias to a game folder. Open it from **Add-ons → GameSnap → Open dictionary**.
 
 Format:
 
@@ -111,14 +133,13 @@ Format:
 [Cyberpunk 2077]
 cyberpunk
 cp2077
-Cyberpunk2077
 
 [Elden Ring]
 eldenring
 ELDEN RING
 ```
 
-GameSnap **learns automatically** — when Playnite detection identifies a game, the alias is saved to the dictionary so future screenshots are matched instantly without Playnite needing to be running.
+GameSnap **learns automatically** — when Playnite detection identifies a game, the alias is saved so future screenshots are matched instantly.
 
 ---
 
@@ -129,6 +150,7 @@ GameSnap **learns automatically** — when Playnite detection identifies a game,
 | Organize screenshots now | Main menu → GameSnap | Manually triggers a full scan of the source folder |
 | Open log | Main menu → GameSnap | Opens the log file in Notepad |
 | Open dictionary | Main menu → GameSnap | Opens dictionary.txt in Notepad |
+| Review unmatched screenshots | Main menu → GameSnap | Opens the review window for unmatched files |
 | Organize screenshots now | Right-click a game | Same as above, scoped to context |
 
 ---
@@ -136,45 +158,17 @@ GameSnap **learns automatically** — when Playnite detection identifies a game,
 ## Troubleshooting
 
 **Screenshots are not being moved**  
-→ Check that the source and destination folders are correctly set in Settings.  
+→ Check that source and destination folders are correctly set.  
 → Open the log (**Main menu → GameSnap → Open log**) to see what happened.
 
 **Wrong game folder was chosen**  
-→ Move the file manually and add the correct alias to `dictionary.txt`.
+→ Move the file manually and add the correct alias to the dictionary.
 
 **A game has no folder yet**  
-→ Create the subfolder inside the destination base. The next scan will pick it up.  
-→ Or enable **Auto-create game folders** in Settings so GameSnap handles this automatically.
+→ Create the subfolder inside the destination base, or enable **Auto-create game folders**.
 
-**ShareX is saving files with timestamps only, no game name**  
+**ShareX is saving files with timestamps only**  
 → In ShareX, set the name pattern to `%t %y-%mo-%d_%h-%mi-%s` so the window title is included.
-
-**Where is the log?**  
-→ **Main menu → GameSnap → Open log**, or navigate to:  
-`%AppData%\Playnite\ExtensionsData\<plugin-id>\gamesnap.log`
-
----
-
-## Migrating from the script version
-
-If you were using the PowerShell script version posted on Reddit, remove these from Playnite's Scripts tab:
-
-- **Game Started** → the `playnite_current_game.txt` writer
-- **Game Finished** → the `Remove-Item` cleanup
-- **App Scripts → On start** → the `wscript.exe LaunchWatcher.vbs` line
-- **App Scripts → On shutdown** → the `Stop-Process` block
-
-GameSnap handles all of this natively.
-
----
-
-## Contributing
-
-Pull requests are welcome! Ideas for improvement:
-
-- **Steam screenshot support** — detect and move screenshots from Steam's own folder
-- **Notification on move** — optional Playnite toast when files are organized
-- **Per-game source folders** — support multiple drop folders for different tools
 
 ---
 
