@@ -1,5 +1,6 @@
 using Playnite.SDK;
 using Playnite.SDK.Data;
+using System.Collections.ObjectModel;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -30,7 +31,7 @@ namespace GameSnapPlugin
         public string SteamPath                    { get; set; } = "";
         public bool EnableLocalProviderIntegration { get; set; } = false;
         public bool EnableEmulatorSupport          { get; set; } = false;
-        public List<EmulatorProfile> EmulatorProfiles { get; set; } = EmulatorProfile.CreateDefaults();
+        public ObservableCollection<EmulatorProfile> EmulatorProfiles { get; set; } = new ObservableCollection<EmulatorProfile>(EmulatorProfile.CreateDefaults());
         public List<string> ImageExtensions        { get; set; } = new List<string> { ".png", ".jpg", ".jpeg" };
         public List<string> VideoExtensions        { get; set; } = new List<string> { ".mp4", ".wmv" };
         public List<string> WindowBlacklist        { get; set; } = new List<string>
@@ -63,7 +64,7 @@ namespace GameSnapPlugin
             // Merge: adiciona built-ins novos que nao existiam em versoes anteriores
             if (Settings.EmulatorProfiles == null || Settings.EmulatorProfiles.Count == 0)
             {
-                Settings.EmulatorProfiles = EmulatorProfile.CreateDefaults();
+                Settings.EmulatorProfiles = new ObservableCollection<EmulatorProfile>(EmulatorProfile.CreateDefaults());
             }
             else
             {
@@ -195,7 +196,6 @@ namespace GameSnapPlugin
         {
             var result = _plugin.PlayniteApi.Dialogs.SelectString("", "Add Emulator", "Emulator name:");
             if (result == null || !result.Result || string.IsNullOrWhiteSpace(result.SelectedString)) return;
-            Settings.EmulatorProfiles ??= new List<EmulatorProfile>();
             Settings.EmulatorProfiles.Add(new EmulatorProfile
             {
                 Name        = result.SelectedString.Trim(),
