@@ -13,29 +13,69 @@ namespace GameSnapPlugin
     // O ViewModel preenche com defaults se o JSON nao tiver dados.
     public class GameSnapSettings : ObservableObject
     {
-        public string SourceFolder                  { get; set; } = "";
-        public List<string> AdditionalSourceFolders { get; set; } = new List<string>();
-        public string DestinationBase               { get; set; } = "";
-        public int PollingIntervalSeconds           { get; set; } = 30;
-        public bool UsePlayniteDetection            { get; set; } = true;
-        public bool UseWindowFallback               { get; set; } = true;
-        public bool AutoCreateFolders               { get; set; } = false;
-        public bool MoveUnmatchedToFolder           { get; set; } = false;
-        public string UnmatchedFolderName           { get; set; } = "_Unmatched";
-        public bool ShowNotifications               { get; set; } = true;
-        public string RenamePattern                 { get; set; } = "{game}_{date}_{time}";
-        public bool EnableBackup                    { get; set; } = false;
-        public string BackupFolder                  { get; set; } = "";
-        public bool EnableSteamSupport              { get; set; } = false;
-        public string SteamPath                     { get; set; } = "";
-        public bool EnableLocalProviderIntegration  { get; set; } = false;
-        public bool EnableEmulatorSupport           { get; set; } = false;
+        private string _sourceFolder = "";
+        public string SourceFolder { get => _sourceFolder; set => SetValue(ref _sourceFolder, value); }
 
-        // Lista vazia — o serializer popula do JSON sem adicionar em cima dos defaults
-        public List<EmulatorProfile> EmulatorProfiles { get; set; } = new List<EmulatorProfile>();
-        public List<string> ImageExtensions           { get; set; } = new List<string>();
-        public List<string> VideoExtensions           { get; set; } = new List<string>();
-        public List<string> WindowBlacklist           { get; set; } = new List<string>();
+        private List<string> _additionalSourceFolders = new List<string>();
+        public List<string> AdditionalSourceFolders { get => _additionalSourceFolders; set => SetValue(ref _additionalSourceFolders, value); }
+
+        private string _destinationBase = "";
+        public string DestinationBase { get => _destinationBase; set => SetValue(ref _destinationBase, value); }
+
+        private int _pollingIntervalSeconds = 30;
+        public int PollingIntervalSeconds { get => _pollingIntervalSeconds; set => SetValue(ref _pollingIntervalSeconds, value); }
+
+        private bool _usePlayniteDetection = true;
+        public bool UsePlayniteDetection { get => _usePlayniteDetection; set => SetValue(ref _usePlayniteDetection, value); }
+
+        private bool _useWindowFallback = true;
+        public bool UseWindowFallback { get => _useWindowFallback; set => SetValue(ref _useWindowFallback, value); }
+
+        private bool _autoCreateFolders = false;
+        public bool AutoCreateFolders { get => _autoCreateFolders; set => SetValue(ref _autoCreateFolders, value); }
+
+        private bool _moveUnmatchedToFolder = false;
+        public bool MoveUnmatchedToFolder { get => _moveUnmatchedToFolder; set => SetValue(ref _moveUnmatchedToFolder, value); }
+
+        private string _unmatchedFolderName = "_Unmatched";
+        public string UnmatchedFolderName { get => _unmatchedFolderName; set => SetValue(ref _unmatchedFolderName, value); }
+
+        private bool _showNotifications = true;
+        public bool ShowNotifications { get => _showNotifications; set => SetValue(ref _showNotifications, value); }
+
+        private string _renamePattern = "{game}_{date}_{time}";
+        public string RenamePattern { get => _renamePattern; set => SetValue(ref _renamePattern, value); }
+
+        private bool _enableBackup = false;
+        public bool EnableBackup { get => _enableBackup; set => SetValue(ref _enableBackup, value); }
+
+        private string _backupFolder = "";
+        public string BackupFolder { get => _backupFolder; set => SetValue(ref _backupFolder, value); }
+
+        private bool _enableSteamSupport = false;
+        public bool EnableSteamSupport { get => _enableSteamSupport; set => SetValue(ref _enableSteamSupport, value); }
+
+        private string _steamPath = "";
+        public string SteamPath { get => _steamPath; set => SetValue(ref _steamPath, value); }
+
+        private bool _enableLocalProviderIntegration = false;
+        public bool EnableLocalProviderIntegration { get => _enableLocalProviderIntegration; set => SetValue(ref _enableLocalProviderIntegration, value); }
+
+        private bool _enableEmulatorSupport = false;
+        public bool EnableEmulatorSupport { get => _enableEmulatorSupport; set => SetValue(ref _enableEmulatorSupport, value); }
+
+        // Listas iniciam vazias — o serializer popula do JSON sem duplicar
+        private List<EmulatorProfile> _emulatorProfiles = new List<EmulatorProfile>();
+        public List<EmulatorProfile> EmulatorProfiles { get => _emulatorProfiles; set => SetValue(ref _emulatorProfiles, value); }
+
+        private List<string> _imageExtensions = new List<string>();
+        public List<string> ImageExtensions { get => _imageExtensions; set => SetValue(ref _imageExtensions, value); }
+
+        private List<string> _videoExtensions = new List<string>();
+        public List<string> VideoExtensions { get => _videoExtensions; set => SetValue(ref _videoExtensions, value); }
+
+        private List<string> _windowBlacklist = new List<string>();
+        public List<string> WindowBlacklist { get => _windowBlacklist; set => SetValue(ref _windowBlacklist, value); }
     }
 
     public class GameSnapSettingsViewModel : ObservableObject, ISettings
