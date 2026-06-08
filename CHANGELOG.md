@@ -5,6 +5,41 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.3.3] — 2026-06-07
+
+### Fixed
+- **Settings amnesia (root cause)** — plugin GUID was a placeholder (`a1b2c3d4-...`) that collided with another plugin's data folder; replaced with a real unique GUID (`1826881c-4e6e-4ed3-ac6c-8605f953daf4`); config.json is now written to the correct location
+- **Settings pattern rewritten** — adopted the ScreenshotsVisualizer/Ludusavi pattern exactly: `GameSnapSettings` is a pure data DTO extending `ObservableObject`; `GameSnapSettingsViewModel` implements `ISettings`, uses `Serialization.GetClone()` for `BeginEdit` snapshot, and `RelayCommand<object>` for commands
+- **Emulator paths not persisting** — `EmulatorProfiles` ObservableCollection in the ViewModel is now synced to/from the DTO `List<T>` on `EndEdit`/`CancelEdit`; the XAML `ItemsControl` binds to `{Binding EmulatorProfiles}` on the ViewModel directly
+- **Duplicate entries in config.json** — all list properties in `GameSnapSettings` now initialize as empty; defaults are applied by the ViewModel constructor only when lists are empty after deserialization, preventing Newtonsoft from appending items on top of existing ones
+- **Crash on Save (circular reference)** — `Settings => this` property caused `JsonSerializationException`; resolved by separating the ISettings object from the data DTO
+- **Browse button broken in Emulators tab** — `EmulatorsView.xaml.cs` was casting `DataContext` to `SettingsViewModel` instead of `GameSnapSettingsViewModel`
+- **Duplicate `EmulatorsView.xaml.cs`** — phantom file in project root removed
+- **Build failures** — removed stale `using Newtonsoft.Json`, duplicate `using System.Collections.ObjectModel`, and `SettingsViewModel` references that no longer exist
+
+### Changed
+- `GetSettings()` now returns `PluginSettings` (the ViewModel singleton), never `new SettingsViewModel()` — prevents state loss on settings reopen
+- `SettingsViewModel.cs` reduced to an empty stub; all logic lives in `Settings.cs`
+- `EmulatorProfile` computed properties (`IsCustom`, `DisplayPath`, `StatusText`, `StatusColor`, `ResolvedPath`) marked with `[IgnoreDataMember]` to prevent serialization of non-persistent data
+
+---
+
+## [1.3.2] — 2026-05-31
+
+### Fixed
+- Settings loss on restart — root cause identified: computed properties in `EmulatorProfile` (`IsCustom`, `DisplayPath`, `StatusText`, `StatusColor`, `ResolvedPath`) were being serialized to `config.json` and causing a version conflict when Playnite's internal Newtonsoft.Json tried to deserialize them; fixed by replacing `[JsonIgnore]` with empty setters, making deserialization always succeed regardless of Newtonsoft version
+- Removed separate `Newtonsoft.Json` package reference that was conflicting with Playnite's bundled version
+
+---
+
+## [1.3.1] — 2026-05-30
+
+### Fixed
+- Settings loss on restart caused by JSON serialization failure — computed properties in `EmulatorProfile` (`StatusText`, `DisplayPath`, `StatusColor`, etc.) were being serialized and failing on deserialization, causing the catch block to return empty defaults; fixed with `[JsonIgnore]` on all computed properties
+- Added `Settings saved` and `Settings loaded` entries to the log for easier debugging
+
+---
+
 ## [1.3.0] — 2026-05-30
 
 ### Added
@@ -31,47 +66,32 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Auto-learns alias after manual assignment
 - **Tooltips** on every setting in the Settings screen — hover over any option to see a description, usage tip, or warning
 
-### Fixed
-- `Open log` and `Open dictionary` menu items not opening Notepad
-- `Watcher stopped` appearing twice in the log on settings save
-- Settings not persisting between sessions — now reloads from disk on every Settings open
-- Settings being reset after plugin update — new fields now merge with saved data instead of overwriting
-
-### Improved
-- Plugin startup is now fully asynchronous — Playnite initialization is no longer blocked
-- File events run off the main thread — no UI freezes when screenshots arrive
-- Window fallback now uses two-stage logic:
-  - **Rule C:** only activates if the file prefix is already known in the dictionary
-  - **Rule D:** only activates during an active game session (between `OnGameStarted` and `OnGameStopped`)
-- Window blacklist expanded to block Explorer, browsers, email clients, terminals, and Playnite itself
-- Automatic pattern blocking for titles containing "e X mais guias", "Explorador de Arquivos", email addresses, OneDrive, etc.
-
 ---
 
-## [1.1.0] — 2026-05-25
+## [1.1.0] — 2026-05-23
 
 ### Added
-- **Notifications** — Playnite toast when screenshots are organized (e.g. "Organized 3 screenshot(s): Elden Ring (2) | Celeste (1)")
-- **Unmatched folder** — move unrecognized screenshots to `_Unmatched` instead of leaving them in the source folder (disabled by default)
-- **Multiple source folders** — monitor more than one capture folder simultaneously
-- **Rename pattern** — customize the output filename using tokens: `{game}`, `{date}`, `{time}`, `{datetime}`, `{original}`
-- **Automatic backup** — copy organized screenshots to a second destination after moving (disabled by default)
-- **Steam screenshot support** — monitors Steam's `userdata` folder and organizes screenshots using your Playnite library to resolve AppIDs (disabled by default)
-- **Screenshots Utilities Local Provider integration** — automatically registers GameSnap's destination folder in the Local Provider `config.json` so screenshots appear in fullscreen viewers like Aniki Remake (disabled by default)
-- **Auto-create game folders** — creates a subfolder for each game when it first starts in Playnite (disabled by default)
+- Steam screenshot support — automatically detects Steam userdata folders and maps AppIDs to game names
+- Local Provider integration — registers destination folder with Screenshot Utilities Local Provider
+- Backup system — optional automatic backup before moving files
+- Rename pattern tokens — `{game}`, `{date}`, `{time}`, `{ext}`
+- Multiple source folders support
+
+### Fixed
+- Window title fallback detection improved — better filtering with blacklist
+- Dictionary learning — aliases now saved automatically after successful window-title match
 
 ---
 
-## [1.0.0] — 2026-05-19
+## [1.0.0] — 2026-05-20
 
-### Initial release
-
-- Real-time file watcher on the source folder (no polling delay)
-- Three-stage detection: Dictionary → Playnite → Active window fallback
-- Auto-learning: aliases saved to `dictionary.txt` when Playnite detection is used
-- Videos moved to `GameFolder\Videos\` subfolder
-- Backup polling loop as safety net alongside the file watcher
-- `Open log` and `Open dictionary` shortcuts in the GameSnap menu
-- `Organize screenshots now` available from the main menu and right-click on any game
-- Settings screen with Browse buttons for all folder paths
-- Works with Xbox Game Bar, ShareX, and any capture tool with a configurable output folder
+### Added
+- Initial release
+- Real-time file watcher on source folder
+- Playnite game detection (currently running game)
+- Active window title fallback detection
+- Dictionary-based alias matching
+- `_Unmatched` folder for unrecognized screenshots
+- Toast notifications
+- Auto-create game folders on game start
+- Settings UI with source/destination folder configuration
