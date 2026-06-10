@@ -64,6 +64,9 @@ namespace GameSnapPlugin
         private bool _enableEmulatorSupport = false;
         public bool EnableEmulatorSupport { get => _enableEmulatorSupport; set => SetValue(ref _enableEmulatorSupport, value); }
 
+        private bool _enableScreenshotsVisualizerRefresh = false;
+        public bool EnableScreenshotsVisualizerRefresh { get => _enableScreenshotsVisualizerRefresh; set => SetValue(ref _enableScreenshotsVisualizerRefresh, value); }
+
         // Listas iniciam vazias — o serializer popula do JSON sem duplicar
         private List<EmulatorProfile> _emulatorProfiles = new List<EmulatorProfile>();
         public List<EmulatorProfile> EmulatorProfiles { get => _emulatorProfiles; set => SetValue(ref _emulatorProfiles, value); }

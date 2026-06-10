@@ -17,6 +17,9 @@ namespace GameSnapPlugin
         // Callback para notificações (injetado pelo plugin principal)
         public Action<string, string>? OnFileMoved { get; set; }
 
+        // Lista de jogos organizados neste ciclo — para notificar ScreenshotsVisualizer
+        public Action<List<string>>? OnGamesOrganized { get; set; }
+
         // Jogo atual informado pelo Playnite
         private string? _currentGame;
 
@@ -85,6 +88,9 @@ namespace GameSnapPlugin
                     "GameSnap",
                     $"Organized {counts.Values.Sum()} screenshot(s): {summary}"
                 );
+
+                // Notifica ScreenshotsVisualizer com a lista de jogos afetados
+                OnGamesOrganized?.Invoke(counts.Keys.ToList());
             }
         }
 

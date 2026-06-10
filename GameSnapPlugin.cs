@@ -148,17 +148,25 @@ namespace GameSnapPlugin
                 _organizer.SteamService = null;
             }
 
-            _organizer.OnFileMoved = (gameName, message) =>
+            _organizer.OnFileMoved = (summary, message) =>
             {
                 if (s.ShowNotifications)
                     PlayniteApi.Notifications.Add(
                         new NotificationMessage(Guid.NewGuid().ToString(), message, NotificationType.Info));
+            };
 
-                // Notifica o ScreenshotsVisualizer para reescanear o jogo
-                var game = PlayniteApi.Database.Games
-                    .FirstOrDefault(g => g.Name.Equals(gameName, StringComparison.OrdinalIgnoreCase));
-                if (game != null)
-                    NotifyScreenshotsVisualizerRefresh(game);
+            _organizer.OnGamesOrganized = (gameNames) =>
+            {
+                if (!s.EnableScreenshotsVisualizerRefresh) return;
+
+                // Notifica o ScreenshotsVisualizer para reescanear cada jogo afetado
+                foreach (var name in gameNames)
+                {
+                    var game = PlayniteApi.Database.Games
+                        .FirstOrDefault(g => g.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                    if (game != null)
+                        NotifyScreenshotsVisualizerRefresh(game);
+                }
             };
 
             _watcher = new WatcherService(s, _organizer, _logger);
