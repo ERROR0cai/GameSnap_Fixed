@@ -5,6 +5,26 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.0] — 2026-06-08
+
+### Added
+- **ScreenshotsVisualizer auto-refresh toggle** — new option in Settings under
+  a dedicated ScreenshotsVisualizer section (disabled by default); when enabled,
+  GameSnap notifies ScreenshotsVisualizer to rescan each affected game after
+  organizing; has no effect if ScreenshotsVisualizer is not installed
+
+### Changed
+- GitHub releases now publish as **drafts** — allows testing before making a
+  release public to other users
+- README updated with a dedicated ScreenshotsVisualizer section, including the
+  suggested `GlobalScreenshootsPath` configuration tip (`{DestinationBase}\{Name}`)
+
+### Removed
+- **Screenshot Utilities Local Provider integration** — removed from settings
+  and codebase; ScreenshotsVisualizer covers this use case more effectively
+
+  ---
+
 ## [1.3.3] — 2026-06-07
 
 ### Fixed
