@@ -203,7 +203,7 @@
                                                                Foreground="#405060" FontSize="12"
                                                                VerticalAlignment="Center"
                                                                Visibility="{Binding PlaceholderVisibility}"/>
-                                                    <ScrollViewer x:Name="PART_ContentHost"/>
+                                                    <ScrollViewer x:Name="PART_ContentHost" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
                                                 </Grid>
                                             </Border>
                                         </ControlTemplate>
