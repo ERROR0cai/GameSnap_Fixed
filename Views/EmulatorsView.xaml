@@ -40,7 +40,7 @@
 
         <!-- Emulator list -->
         <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding Settings.EmulatorProfiles}">
+            <ItemsControl ItemsSource="{Binding EmulatorProfiles}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Border Margin="0,0,0,8" Padding="12,10"
