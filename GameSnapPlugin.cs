@@ -223,6 +223,12 @@ namespace GameSnapPlugin
                 MenuSection = "@GameSnap",
                 Action = _ => OpenReviewWindow()
             };
+            yield return new MainMenuItem
+            {
+                Description = "Review unmatched screenshots (Fullscreen / Gamepad)",
+                MenuSection = "@GameSnap",
+                Action = _ => OpenFullscreenReviewWindow()
+            };
         }
 
         private void OpenReviewWindow()
@@ -235,6 +241,18 @@ namespace GameSnapPlugin
             var vm     = new ReviewViewModel(PlayniteApi, S, _dict, _organizer, _logger);
             var window = new Views.ReviewWindow(vm);
             vm.SetCloseAction(() => window.Close());
+            window.ShowDialog();
+        }
+
+        private void OpenFullscreenReviewWindow()
+        {
+            if (_organizer == null || _dict == null || _logger == null)
+            {
+                PlayniteApi.Dialogs.ShowMessage("GameSnap is not fully initialized.", "GameSnap");
+                return;
+            }
+            var window = new Views.FullscreenReviewWindow(
+                PlayniteApi, S, _dict, _organizer, _logger);
             window.ShowDialog();
         }
     }

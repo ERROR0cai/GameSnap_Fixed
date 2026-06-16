@@ -1,0 +1,226 @@
+<Window x:Class="GameSnapPlugin.Views.FullscreenReviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="GameSnap — Review Unmatched Screenshots"
+        WindowStyle="None"
+        WindowState="Maximized"
+        Background="#000000"
+        Focusable="True"
+        KeyDown="Window_KeyDown">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="80"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="70"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="40,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock x:Name="TitleLabel"
+                           Text="Review Unmatched Screenshots"
+                           FontSize="28" FontWeight="Bold"
+                           Foreground="White"/>
+                <TextBlock x:Name="SubtitleLabel"
+                           FontSize="16" Foreground="#888888" Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <TextBlock Grid.Column="1" x:Name="CounterLabel"
+                       FontSize="18" Foreground="#888888"
+                       VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Main content -->
+        <Grid Grid.Row="1" Margin="40,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="50"/>
+                <ColumnDefinition Width="380"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Screenshot preview -->
+            <Border Grid.Column="0" Background="#0d0d0d" CornerRadius="8">
+                <Grid>
+                    <Image x:Name="PreviewImage"
+                           Stretch="Uniform"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock x:Name="NoPreviewLabel"
+                               Text="Select a file to preview"
+                               FontSize="20" Foreground="#444444"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- File list + game picker -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="30"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Unmatched files -->
+                <Border Grid.Row="0" Background="#0d0d0d" CornerRadius="8">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="Unmatched Files"
+                                   FontSize="14" FontWeight="Bold"
+                                   Foreground="#888888" Margin="16,12,16,8"/>
+                        <ListBox Grid.Row="1"
+                                 x:Name="FileList"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 SelectionChanged="FileList_SelectionChanged"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="4,6">
+                                        <TextBlock Text="{Binding FileName}"
+                                                   FontSize="14" Foreground="White"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding DateString}"
+                                                   FontSize="11" Foreground="#666666"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Padding" Value="8,4"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="#1a6fb5"/>
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#1a3a5c"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+                    </Grid>
+                </Border>
+
+                <!-- Game list -->
+                <Border Grid.Row="2" Background="#0d0d0d" CornerRadius="8">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="Assign to Game"
+                                   FontSize="14" FontWeight="Bold"
+                                   Foreground="#888888" Margin="16,12,16,8"/>
+                        <ListBox Grid.Row="1"
+                                 x:Name="GameList"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 DisplayMemberPath="Name"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Padding" Value="12,8"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                    <Setter Property="FontSize" Value="15"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="#1a6fb5"/>
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#1a3a5c"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- Footer — actions + button hints -->
+        <Grid Grid.Row="2" Margin="40,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Action buttons -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal"
+                        VerticalAlignment="Center" Spacing="16">
+                <Button x:Name="BtnAssign"
+                        Content="Assign to selected game"
+                        Click="BtnAssign_Click"
+                        FontSize="16" Padding="24,10"
+                        Background="#1a6fb5" Foreground="White"
+                        BorderThickness="0"/>
+                <Button x:Name="BtnSkip"
+                        Content="Skip"
+                        Click="BtnSkip_Click"
+                        FontSize="16" Padding="24,10"
+                        Background="#2a2a2a" Foreground="White"
+                        BorderThickness="0"/>
+                <Button x:Name="BtnDelete"
+                        Content="Delete file"
+                        Click="BtnDelete_Click"
+                        FontSize="16" Padding="24,10"
+                        Background="#5c1a1a" Foreground="White"
+                        BorderThickness="0"/>
+            </StackPanel>
+
+            <!-- Xbox button hints -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal"
+                        VerticalAlignment="Center" Spacing="24">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Border Background="#1a6fb5" CornerRadius="20"
+                            Width="32" Height="32">
+                        <TextBlock Text="A" FontWeight="Bold" FontSize="14"
+                                   Foreground="White"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="Assign" Foreground="#aaaaaa"
+                               FontSize="14" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Border Background="#333333" CornerRadius="20"
+                            Width="32" Height="32">
+                        <TextBlock Text="B" FontWeight="Bold" FontSize="14"
+                                   Foreground="White"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="Close" Foreground="#aaaaaa"
+                               FontSize="14" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Border Background="#333333" CornerRadius="20"
+                            Width="32" Height="32">
+                        <TextBlock Text="☰" FontSize="12"
+                                   Foreground="White"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="Skip" Foreground="#aaaaaa"
+                               FontSize="14" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="D-pad" Foreground="#aaaaaa"
+                               FontSize="14" VerticalAlignment="Center"/>
+                    <TextBlock Text="Navigate" Foreground="#666666"
+                               FontSize="14" VerticalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
