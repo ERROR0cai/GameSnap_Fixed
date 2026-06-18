@@ -173,10 +173,15 @@ namespace GameSnapPlugin.Views
         // Ao confirmar, a lista de jogos é filtrada pelo texto digitado.
         private void OpenGameSearch()
         {
+            var currentFile = FileList.SelectedItem as UnmatchedFileItem;
+            var prompt = currentFile != null
+                ? $"Search game for: {currentFile.FileName}"
+                : "Search game:";
+
             var result = _api.Dialogs.SelectString(
-                GameSearchLabel.Text ?? "",
-                "Search Game",
-                "Type part of the game name:");
+                "",
+                "GameSnap",
+                prompt);
 
             if (result == null || !result.Result) return;
 
@@ -221,7 +226,13 @@ namespace GameSnapPlugin.Views
         private void Assign()
         {
             if (FileList.SelectedItem is not UnmatchedFileItem file) return;
-            if (GameList.SelectedItem is not Game game) return;
+
+            if (GameList.SelectedItem is not Game game)
+            {
+                // Nenhum jogo selecionado ainda — abre a busca em vez de falhar silenciosamente
+                GameSearchButton.Focus();
+                return;
+            }
 
             try
             {
@@ -302,17 +313,31 @@ namespace GameSnapPlugin.Views
         //   4. D-pad baixo -> entra na lista filtrada
         //   5. A -> Assign
 
+        // IsFocused só é true para o elemento exato com foco — um ListBox
+        // quase nunca tem IsFocused=true porque o foco real fica no
+        // ListBoxItem interno. IsKeyboardFocusWithin verifica o elemento
+        // E seus filhos, que é o que precisamos aqui.
+        private bool IsFileListActive   => FileList.IsKeyboardFocusWithin;
+        private bool IsSearchBtnActive  => GameSearchButton.IsKeyboardFocusWithin;
+        private bool IsGameListActive   => GameList.IsKeyboardFocusWithin;
+
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
             switch (e.Key)
             {
                 case Key.Enter:       // A button
-                    if (GameSearchButton.IsFocused)
+                    if (IsSearchBtnActive)
+                    {
                         OpenGameSearch();
-                    else if (FileList.IsFocused || PreviewImage.IsFocused)
-                        GameSearchButton.Focus();
-                    else
+                    }
+                    else if (IsGameListActive)
+                    {
                         Assign();
+                    }
+                    else // file list or anywhere else -> open search next
+                    {
+                        GameSearchButton.Focus();
+                    }
                     e.Handled = true;
                     break;
 
@@ -328,9 +353,9 @@ namespace GameSnapPlugin.Views
 
                 case Key.Tab:
                     // Tab cycles: file list -> search button -> game list -> file list
-                    if (FileList.IsKeyboardFocusWithin)
+                    if (IsFileListActive)
                         GameSearchButton.Focus();
-                    else if (GameSearchButton.IsFocused)
+                    else if (IsSearchBtnActive)
                         GameList.Focus();
                     else
                         FileList.Focus();
@@ -347,7 +372,7 @@ namespace GameSnapPlugin.Views
                     e.Handled = true;
                     break;
 
-                case Key.Down when GameSearchButton.IsFocused:
+                case Key.Down when IsSearchBtnActive:
                     GameList.Focus();
                     if (GameList.Items.Count > 0 && GameList.SelectedIndex < 0)
                         GameList.SelectedIndex = 0;

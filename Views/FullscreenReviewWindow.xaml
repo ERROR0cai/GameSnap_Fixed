@@ -136,6 +136,17 @@
                                     MouseLeftButtonUp="GameSearchButton_Click"
                                     Focusable="True"
                                     KeyDown="GameSearchButton_KeyDown">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Style.Triggers>
+                                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                                <Setter Property="BorderBrush" Value="#1a6fb5"/>
+                                                <Setter Property="BorderThickness" Value="2"/>
+                                                <Setter Property="Background" Value="#15243a"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
                                 <Grid>
                                     <TextBlock x:Name="GameSearchPlaceholder"
                                                Text="🔍 Press A to search a game..."
