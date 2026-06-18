@@ -5,8 +5,7 @@
         WindowStyle="None"
         WindowState="Maximized"
         Background="#000000"
-        Focusable="True"
-        KeyDown="Window_KeyDown">
+        Focusable="True">
 
     <Grid>
         <Grid.RowDefinitions>
