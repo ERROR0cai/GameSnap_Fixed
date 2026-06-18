@@ -1,11 +1,12 @@
 <Window x:Class="GameSnapPlugin.Views.FullscreenReviewWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="GameSnap - Review Unmatched Screenshots"
+        Title="GameSnap — Review Unmatched Screenshots"
         WindowStyle="None"
         WindowState="Maximized"
         Background="#000000"
-        Focusable="True">
+        Focusable="True"
+        KeyDown="Window_KeyDown">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -117,9 +118,35 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Text="Assign to Game"
-                                   FontSize="14" FontWeight="Bold"
-                                   Foreground="#888888" Margin="16,12,16,8"/>
+                        <Grid Grid.Row="0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="Assign to Game"
+                                       FontSize="14" FontWeight="Bold"
+                                       Foreground="#888888" Margin="16,12,16,4"/>
+                            <Border Grid.Row="1"
+                                    x:Name="GameSearchButton"
+                                    Margin="16,0,16,8"
+                                    Padding="8,8"
+                                    Background="#1a1a1a"
+                                    BorderBrush="#444444"
+                                    BorderThickness="1"
+                                    Cursor="Hand"
+                                    MouseLeftButtonUp="GameSearchButton_Click"
+                                    Focusable="True"
+                                    KeyDown="GameSearchButton_KeyDown">
+                                <Grid>
+                                    <TextBlock x:Name="GameSearchPlaceholder"
+                                               Text="🔍 Press A to search a game..."
+                                               FontSize="13" Foreground="#666666"/>
+                                    <TextBlock x:Name="GameSearchLabel"
+                                               FontSize="14" Foreground="White"
+                                               Visibility="Collapsed"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
                         <ListBox Grid.Row="1"
                                  x:Name="GameList"
                                  Background="Transparent"
@@ -218,7 +245,7 @@
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="D-pad" Foreground="#aaaaaa"
                                FontSize="14" VerticalAlignment="Center"/>
-                    <TextBlock Text="Navigate" Foreground="#666666"
+                    <TextBlock Text="Navigate / Search" Foreground="#666666"
                                FontSize="14" VerticalAlignment="Center"/>
                 </StackPanel>
             </StackPanel>

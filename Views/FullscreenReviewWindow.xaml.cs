@@ -36,6 +36,7 @@ namespace GameSnapPlugin.Views
 
         private ObservableCollection<UnmatchedFileItem> _files;
         private List<Game> _allGames;
+        private ObservableCollection<Game> _filteredGames;
 
         public FullscreenReviewWindow(
             IPlayniteAPI api,
@@ -61,7 +62,7 @@ namespace GameSnapPlugin.Views
             LoadGames();
 
             FileList.ItemsSource = _files;
-            GameList.ItemsSource = _allGames;
+            GameList.ItemsSource = _filteredGames;
 
             if (_files.Count > 0)
                 FileList.SelectedIndex = 0;
@@ -103,12 +104,29 @@ namespace GameSnapPlugin.Views
                 .Select(g => g.First())
                 .OrderBy(g => g.Name)
                 .ToList();
+
+            _filteredGames = new ObservableCollection<Game>(_allGames);
+        }
+
+        private void FilterGames(string query)
+        {
+            _filteredGames.Clear();
+
+            var matches = string.IsNullOrWhiteSpace(query)
+                ? _allGames
+                : _allGames.Where(g => g.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0);
+
+            foreach (var g in matches)
+                _filteredGames.Add(g);
+
+            if (_filteredGames.Count > 0)
+                GameList.SelectedIndex = 0;
         }
 
         private void UpdateCounters()
         {
-            CounterLabel.Text    = $"{_files.Count} file(s) pending";
-            SubtitleLabel.Text   = _files.Count > 0
+            CounterLabel.Text  = $"{_files.Count} file(s) pending";
+            SubtitleLabel.Text = _files.Count > 0
                 ? _files[0].FileName
                 : "All done!";
         }
@@ -128,18 +146,18 @@ namespace GameSnapPlugin.Views
                 {
                     var bmp = new BitmapImage();
                     bmp.BeginInit();
-                    bmp.UriSource      = new Uri(item.FullPath);
-                    bmp.CacheOption    = BitmapCacheOption.OnLoad;
+                    bmp.UriSource     = new Uri(item.FullPath);
+                    bmp.CacheOption   = BitmapCacheOption.OnLoad;
                     bmp.EndInit();
-                    PreviewImage.Source    = bmp;
-                    PreviewImage.Visibility  = Visibility.Visible;
+                    PreviewImage.Source       = bmp;
+                    PreviewImage.Visibility   = Visibility.Visible;
                     NoPreviewLabel.Visibility = Visibility.Collapsed;
                 }
                 else
                 {
-                    PreviewImage.Source    = null;
-                    PreviewImage.Visibility  = Visibility.Collapsed;
-                    NoPreviewLabel.Text      = "Video preview not available";
+                    PreviewImage.Source       = null;
+                    PreviewImage.Visibility   = Visibility.Collapsed;
+                    NoPreviewLabel.Text       = "Video preview not available";
                     NoPreviewLabel.Visibility = Visibility.Visible;
                 }
             }
@@ -147,6 +165,50 @@ namespace GameSnapPlugin.Views
             {
                 PreviewImage.Visibility  = Visibility.Collapsed;
                 NoPreviewLabel.Visibility = Visibility.Visible;
+            }
+        }
+
+        // Abre o teclado virtual nativo do Playnite (SelectString) — em
+        // fullscreen, isso já mostra o teclado on-screen com suporte a D-pad.
+        // Ao confirmar, a lista de jogos é filtrada pelo texto digitado.
+        private void OpenGameSearch()
+        {
+            var result = _api.Dialogs.SelectString(
+                GameSearchLabel.Text ?? "",
+                "Search Game",
+                "Type part of the game name:");
+
+            if (result == null || !result.Result) return;
+
+            var query = result.SelectedString ?? "";
+            FilterGames(query);
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                GameSearchPlaceholder.Visibility = Visibility.Visible;
+                GameSearchLabel.Visibility       = Visibility.Collapsed;
+            }
+            else
+            {
+                GameSearchLabel.Text             = query;
+                GameSearchPlaceholder.Visibility = Visibility.Collapsed;
+                GameSearchLabel.Visibility       = Visibility.Visible;
+            }
+
+            // Após confirmar a busca, move o foco para a lista já filtrada
+            GameList.Focus();
+            if (_filteredGames.Count > 0)
+                GameList.SelectedIndex = 0;
+        }
+
+        private void GameSearchButton_Click(object sender, MouseButtonEventArgs e) => OpenGameSearch();
+
+        private void GameSearchButton_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                OpenGameSearch();
+                e.Handled = true;
             }
         }
 
@@ -175,7 +237,7 @@ namespace GameSnapPlugin.Views
                 if (!string.IsNullOrWhiteSpace(prefix))
                     _dict.SaveAlias(prefix, game.Name);
 
-                _logger.Info($"[Fullscreen Review] Assigned {file.FileName} → {game.Name}");
+                _logger.Info($"[Fullscreen Review] Assigned {file.FileName} -> {game.Name}");
 
                 _files.Remove(file);
                 UpdateCounters();
@@ -232,14 +294,23 @@ namespace GameSnapPlugin.Views
         //   B     → Escape
         //   Start → F1  (via XInput)
         //   D-pad → Arrow keys (WPF handles ListBox navigation natively)
+        //
+        // Fluxo de busca:
+        //   1. D-pad direita (na lista de arquivos) -> foca o bota de busca
+        //   2. A -> abre o teclado virtual nativo do Playnite (SelectString)
+        //   3. Digite e confirme -> a lista de jogos ja aparece filtrada
+        //   4. D-pad baixo -> entra na lista filtrada
+        //   5. A -> Assign
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
             switch (e.Key)
             {
                 case Key.Enter:       // A button
-                    if (FileList.IsFocused || PreviewImage.IsFocused)
-                        GameList.Focus();   // move focus to game list first
+                    if (GameSearchButton.IsFocused)
+                        OpenGameSearch();
+                    else if (FileList.IsFocused || PreviewImage.IsFocused)
+                        GameSearchButton.Focus();
                     else
                         Assign();
                     e.Handled = true;
@@ -256,8 +327,10 @@ namespace GameSnapPlugin.Views
                     break;
 
                 case Key.Tab:
-                    // Tab toggles focus between file list and game list
+                    // Tab cycles: file list -> search button -> game list -> file list
                     if (FileList.IsKeyboardFocusWithin)
+                        GameSearchButton.Focus();
+                    else if (GameSearchButton.IsFocused)
                         GameList.Focus();
                     else
                         FileList.Focus();
@@ -270,7 +343,14 @@ namespace GameSnapPlugin.Views
                     break;
 
                 case Key.Right:
+                    GameSearchButton.Focus();
+                    e.Handled = true;
+                    break;
+
+                case Key.Down when GameSearchButton.IsFocused:
                     GameList.Focus();
+                    if (GameList.Items.Count > 0 && GameList.SelectedIndex < 0)
+                        GameList.SelectedIndex = 0;
                     e.Handled = true;
                     break;
             }
