@@ -1,12 +1,11 @@
 <Window x:Class="GameSnapPlugin.Views.FullscreenReviewWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="GameSnap — Review Unmatched Screenshots"
+        Title="GameSnap - Review Unmatched Screenshots"
         WindowStyle="None"
         WindowState="Maximized"
         Background="#000000"
-        Focusable="True"
-        KeyDown="Window_KeyDown">
+        Focusable="True">
 
     <Grid>
         <Grid.RowDefinitions>

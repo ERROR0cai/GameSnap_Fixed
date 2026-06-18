@@ -46,6 +46,11 @@ namespace GameSnapPlugin.Views
         {
             InitializeComponent();
 
+            // KeyDown wired here instead of in XAML to avoid a MSBuild/XAML
+            // compiler ambiguity (CS0426) when the assembly's root namespace
+            // matches the main plugin class name (GameSnapPlugin).
+            this.KeyDown += Window_KeyDown;
+
             _api      = api;
             _settings = settings;
             _dict     = dict;
