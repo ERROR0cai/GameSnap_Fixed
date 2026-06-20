@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 
@@ -13,30 +14,31 @@ namespace GameSnapPlugin.Views
 {
     public class UnmatchedFileItem
     {
-        public string FullPath  { get; set; }
-        public string FileName  { get; set; }
+        public string FullPath   { get; set; }
+        public string FileName   { get; set; }
         public string DateString { get; set; }
 
         public UnmatchedFileItem(string path)
         {
             FullPath   = path;
             FileName   = Path.GetFileName(path);
-            var info   = new FileInfo(path);
-            DateString = info.LastWriteTime.ToString("yyyy-MM-dd HH:mm");
+            DateString = new FileInfo(path).LastWriteTime.ToString("yyyy-MM-dd HH:mm");
         }
     }
 
     public partial class FullscreenReviewWindow : Window
     {
-        private readonly IPlayniteAPI        _api;
-        private readonly GameSnapSettings    _settings;
-        private readonly DictionaryService   _dict;
-        private readonly OrganizerService    _organizer;
-        private readonly GameSnapLogger      _logger;
+        private readonly IPlayniteAPI      _api;
+        private readonly GameSnapSettings  _settings;
+        private readonly DictionaryService _dict;
+        private readonly GameSnapLogger    _logger;
 
-        private ObservableCollection<UnmatchedFileItem> _files;
-        private List<Game> _allGames;
-        private ObservableCollection<Game> _filteredGames;
+        private ObservableCollection<UnmatchedFileItem> _files = new ObservableCollection<UnmatchedFileItem>();
+        private List<Game>                              _allGames = new List<Game>();
+        private ObservableCollection<Game>              _filteredGames = new ObservableCollection<Game>();
+
+        // Estado da tela de busca
+        private string _searchQuery = "";
 
         public FullscreenReviewWindow(
             IPlayniteAPI api,
@@ -46,55 +48,44 @@ namespace GameSnapPlugin.Views
             GameSnapLogger logger)
         {
             InitializeComponent();
-
-            // KeyDown wired here instead of in XAML to avoid a MSBuild/XAML
-            // compiler ambiguity (CS0426) when the assembly's root namespace
-            // matches the main plugin class name (GameSnapPlugin).
             this.KeyDown += Window_KeyDown;
 
             _api      = api;
             _settings = settings;
             _dict     = dict;
-            _organizer = organizer;
             _logger   = logger;
 
             LoadFiles();
             LoadGames();
 
-            FileList.ItemsSource = _files;
-            GameList.ItemsSource = _filteredGames;
+            FileList.ItemsSource         = _files;
+            SearchResultList.ItemsSource = _filteredGames;
 
             if (_files.Count > 0)
                 FileList.SelectedIndex = 0;
 
-            FileList.Focus();
+            Loaded += (s, e) => FileList.Focus();
         }
 
-        // ── Data loading ─────────────────────────────────────────────────────────
+        // ── Data ─────────────────────────────────────────────────────────────────
 
         private void LoadFiles()
         {
-            var unmatchedPath = Path.Combine(
-                _settings.DestinationBase,
-                _settings.UnmatchedFolderName);
+            var path = Path.Combine(_settings.DestinationBase, _settings.UnmatchedFolderName);
+            _files.Clear();
 
-            var items = new List<UnmatchedFileItem>();
+            if (!Directory.Exists(path)) return;
 
-            if (Directory.Exists(unmatchedPath))
-            {
-                var extensions = _settings.ImageExtensions
-                    .Concat(_settings.VideoExtensions)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var exts = _settings.ImageExtensions
+                .Concat(_settings.VideoExtensions)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-                items = Directory.GetFiles(unmatchedPath)
-                    .Where(f => extensions.Contains(Path.GetExtension(f)))
-                    .OrderByDescending(f => new FileInfo(f).LastWriteTime)
-                    .Select(f => new UnmatchedFileItem(f))
-                    .ToList();
-            }
+            foreach (var f in Directory.GetFiles(path)
+                .Where(f => exts.Contains(Path.GetExtension(f)))
+                .OrderByDescending(f => new FileInfo(f).LastWriteTime))
+                _files.Add(new UnmatchedFileItem(f));
 
-            _files = new ObservableCollection<UnmatchedFileItem>(items);
-            UpdateCounters();
+            UpdateMainCounters();
         }
 
         private void LoadGames()
@@ -104,50 +95,35 @@ namespace GameSnapPlugin.Views
                 .Select(g => g.First())
                 .OrderBy(g => g.Name)
                 .ToList();
-
-            _filteredGames = new ObservableCollection<Game>(_allGames);
         }
 
-        private void FilterGames(string query)
-        {
-            _filteredGames.Clear();
-
-            var matches = string.IsNullOrWhiteSpace(query)
-                ? _allGames
-                : _allGames.Where(g => g.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0);
-
-            foreach (var g in matches)
-                _filteredGames.Add(g);
-
-            if (_filteredGames.Count > 0)
-                GameList.SelectedIndex = 0;
-        }
-
-        private void UpdateCounters()
+        private void UpdateMainCounters()
         {
             CounterLabel.Text  = $"{_files.Count} file(s) pending";
-            SubtitleLabel.Text = _files.Count > 0
-                ? _files[0].FileName
-                : "All done!";
+            SubtitleLabel.Text = "";
         }
 
-        // ── UI events ────────────────────────────────────────────────────────────
+        // ── Main screen ──────────────────────────────────────────────────────────
 
-        private void FileList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        private void FileList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (FileList.SelectedItem is not UnmatchedFileItem item) return;
 
             SubtitleLabel.Text = item.FileName;
+            LoadPreview(item.FullPath);
+        }
 
+        private void LoadPreview(string path)
+        {
             try
             {
-                var ext = Path.GetExtension(item.FullPath).ToLowerInvariant();
+                var ext = Path.GetExtension(path).ToLowerInvariant();
                 if (_settings.ImageExtensions.Contains(ext))
                 {
                     var bmp = new BitmapImage();
                     bmp.BeginInit();
-                    bmp.UriSource     = new Uri(item.FullPath);
-                    bmp.CacheOption   = BitmapCacheOption.OnLoad;
+                    bmp.UriSource   = new Uri(path);
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
                     bmp.EndInit();
                     PreviewImage.Source       = bmp;
                     PreviewImage.Visibility   = Visibility.Visible;
@@ -157,82 +133,116 @@ namespace GameSnapPlugin.Views
                 {
                     PreviewImage.Source       = null;
                     PreviewImage.Visibility   = Visibility.Collapsed;
-                    NoPreviewLabel.Text       = "Video preview not available";
+                    NoPreviewLabel.Text       = "Video — no preview";
                     NoPreviewLabel.Visibility = Visibility.Visible;
                 }
             }
             catch
             {
-                PreviewImage.Visibility  = Visibility.Collapsed;
+                PreviewImage.Source       = null;
+                PreviewImage.Visibility   = Visibility.Collapsed;
+                NoPreviewLabel.Text       = "Cannot load preview";
                 NoPreviewLabel.Visibility = Visibility.Visible;
             }
         }
 
-        // Abre o teclado virtual nativo do Playnite (SelectString) — em
-        // fullscreen, isso já mostra o teclado on-screen com suporte a D-pad.
-        // Ao confirmar, a lista de jogos é filtrada pelo texto digitado.
-        private void OpenGameSearch()
+        // ── Search screen ────────────────────────────────────────────────────────
+
+        private void OpenSearchScreen()
         {
-            var currentFile = FileList.SelectedItem as UnmatchedFileItem;
-            var prompt = currentFile != null
-                ? $"Search game for: {currentFile.FileName}"
-                : "Search game:";
+            _searchQuery = "";
+            UpdateSearchQuery();
+            FilterGames();
 
-            var result = _api.Dialogs.SelectString(
-                "",
-                "GameSnap",
-                prompt);
+            var current = FileList.SelectedItem as UnmatchedFileItem;
+            SearchFileLabel.Text = current?.FileName ?? "";
 
-            if (result == null || !result.Result) return;
+            MainScreen.Visibility   = Visibility.Collapsed;
+            SearchScreen.Visibility = Visibility.Visible;
 
-            var query = result.SelectedString ?? "";
-            FilterGames(query);
+            // Foca a primeira tecla do teclado
+            FocusFirstKey();
+        }
 
-            if (string.IsNullOrWhiteSpace(query))
-            {
-                GameSearchPlaceholder.Visibility = Visibility.Visible;
-                GameSearchLabel.Visibility       = Visibility.Collapsed;
-            }
-            else
-            {
-                GameSearchLabel.Text             = query;
-                GameSearchPlaceholder.Visibility = Visibility.Collapsed;
-                GameSearchLabel.Visibility       = Visibility.Visible;
-            }
+        private void CloseSearchScreen()
+        {
+            SearchScreen.Visibility = Visibility.Collapsed;
+            MainScreen.Visibility   = Visibility.Visible;
+            FileList.Focus();
+        }
 
-            // Após confirmar a busca, move o foco para a lista já filtrada
-            GameList.Focus();
+        private void UpdateSearchQuery()
+        {
+            SearchQueryLabel.Text = _searchQuery;
+            // O cursor fica depois do texto
+            SearchCursorLabel.Margin = new Thickness(
+                Math.Max(0, _searchQuery.Length * 16.8), 0, 0, 0);
+        }
+
+        private void FilterGames()
+        {
+            _filteredGames.Clear();
+
+            var matches = string.IsNullOrEmpty(_searchQuery)
+                ? _allGames
+                : _allGames.Where(g => g.Name.IndexOf(_searchQuery, StringComparison.OrdinalIgnoreCase) >= 0);
+
+            foreach (var g in matches)
+                _filteredGames.Add(g);
+
             if (_filteredGames.Count > 0)
-                GameList.SelectedIndex = 0;
+                SearchResultList.SelectedIndex = 0;
         }
 
-        private void GameSearchButton_Click(object sender, MouseButtonEventArgs e) => OpenGameSearch();
+        // ── Keyboard logic ───────────────────────────────────────────────────────
 
-        private void GameSearchButton_KeyDown(object sender, KeyEventArgs e)
+        private void Key_Click(object sender, RoutedEventArgs e)
         {
-            if (e.Key == Key.Enter)
+            if (sender is not Button btn) return;
+            var tag = btn.Tag as string ?? "";
+            ProcessKey(tag);
+        }
+
+        private void ProcessKey(string key)
+        {
+            switch (key)
             {
-                OpenGameSearch();
-                e.Handled = true;
+                case "BACK":
+                    if (_searchQuery.Length > 0)
+                        _searchQuery = _searchQuery[..^1];
+                    break;
+                case "SPACE":
+                    _searchQuery += " ";
+                    break;
+                case "CLEAR":
+                    _searchQuery = "";
+                    break;
+                default:
+                    _searchQuery += key;
+                    break;
+            }
+
+            UpdateSearchQuery();
+            FilterGames();
+        }
+
+        private void FocusFirstKey()
+        {
+            // Foca o primeiro botão do teclado virtual
+            var rows = new[] { 0, 1, 2, 3 };
+            foreach (var row in VirtualKeyboard.Children.OfType<UniformGrid>())
+            {
+                var first = row.Children.OfType<Button>().FirstOrDefault();
+                if (first != null) { first.Focus(); return; }
             }
         }
-
-        private void BtnAssign_Click(object sender, RoutedEventArgs e) => Assign();
-        private void BtnSkip_Click(object sender, RoutedEventArgs e)   => Skip();
-        private void BtnDelete_Click(object sender, RoutedEventArgs e) => DeleteFile();
 
         // ── Actions ──────────────────────────────────────────────────────────────
 
-        private void Assign()
+        private void AssignCurrentFile()
         {
             if (FileList.SelectedItem is not UnmatchedFileItem file) return;
-
-            if (GameList.SelectedItem is not Game game)
-            {
-                // Nenhum jogo selecionado ainda — abre a busca em vez de falhar silenciosamente
-                GameSearchButton.Focus();
-                return;
-            }
+            if (SearchResultList.SelectedItem is not Game game) return;
 
             try
             {
@@ -242,16 +252,15 @@ namespace GameSnapPlugin.Views
                 var destPath = Path.Combine(destFolder, Path.GetFileName(file.FullPath));
                 File.Move(file.FullPath, destPath);
 
-                // Learn alias from file prefix
-                var prefix = Path.GetFileNameWithoutExtension(file.FileName)
-                    .Split('_')[0];
+                var prefix = Path.GetFileNameWithoutExtension(file.FileName).Split('_')[0];
                 if (!string.IsNullOrWhiteSpace(prefix))
                     _dict.SaveAlias(prefix, game.Name);
 
-                _logger.Info($"[Fullscreen Review] Assigned {file.FileName} -> {game.Name}");
+                _logger.Info($"[Fullscreen Review] {file.FileName} -> {game.Name}");
 
                 _files.Remove(file);
-                UpdateCounters();
+                UpdateMainCounters();
+                CloseSearchScreen();
 
                 if (_files.Count > 0)
                     FileList.SelectedIndex = 0;
@@ -261,24 +270,23 @@ namespace GameSnapPlugin.Views
             catch (Exception ex)
             {
                 _logger.Error($"[Fullscreen Review] Assign failed: {ex.Message}");
+                CloseSearchScreen();
             }
         }
 
-        private void Skip()
+        private void SkipFile()
         {
             if (_files.Count == 0) return;
             var idx = FileList.SelectedIndex;
             FileList.SelectedIndex = (idx + 1) % _files.Count;
         }
 
-        private void DeleteFile()
+        private void DeleteCurrentFile()
         {
             if (FileList.SelectedItem is not UnmatchedFileItem file) return;
 
             var result = _api.Dialogs.ShowMessage(
-                $"Delete {file.FileName}?",
-                "GameSnap",
-                MessageBoxButton.YesNo);
+                $"Delete {file.FileName}?", "GameSnap", MessageBoxButton.YesNo);
 
             if (result != MessageBoxResult.Yes) return;
 
@@ -286,8 +294,7 @@ namespace GameSnapPlugin.Views
             {
                 File.Delete(file.FullPath);
                 _files.Remove(file);
-                UpdateCounters();
-
+                UpdateMainCounters();
                 if (_files.Count > 0)
                     FileList.SelectedIndex = 0;
                 else
@@ -300,84 +307,100 @@ namespace GameSnapPlugin.Views
         }
 
         // ── Keyboard / gamepad input ─────────────────────────────────────────────
-        // Xbox controller maps to keyboard via Windows:
-        //   A     → Enter
-        //   B     → Escape
-        //   Start → F1  (via XInput)
-        //   D-pad → Arrow keys (WPF handles ListBox navigation natively)
         //
-        // Fluxo de busca:
-        //   1. D-pad direita (na lista de arquivos) -> foca o bota de busca
-        //   2. A -> abre o teclado virtual nativo do Playnite (SelectString)
-        //   3. Digite e confirme -> a lista de jogos ja aparece filtrada
-        //   4. D-pad baixo -> entra na lista filtrada
-        //   5. A -> Assign
-
-        // IsFocused só é true para o elemento exato com foco — um ListBox
-        // quase nunca tem IsFocused=true porque o foco real fica no
-        // ListBoxItem interno. IsKeyboardFocusWithin verifica o elemento
-        // E seus filhos, que é o que precisamos aqui.
-        private bool IsFileListActive   => FileList.IsKeyboardFocusWithin;
-        private bool IsSearchBtnActive  => GameSearchButton.IsKeyboardFocusWithin;
-        private bool IsGameListActive   => GameList.IsKeyboardFocusWithin;
+        // TELA PRINCIPAL:
+        //   D-pad ↑↓  → navega lista de arquivos (WPF nativo)
+        //   A (Enter) → abre tela de busca
+        //   B (Esc)   → fecha janela
+        //   Start(F1) → skip arquivo
+        //
+        // TELA DE BUSCA:
+        //   D-pad ↑↓←→ → navega teclas do teclado virtual (WPF nativo via Tab/Arrow)
+        //   A (Enter)  → se no teclado: digita tecla; se na lista: confirma assign
+        //   B (Esc)    → volta para tela principal
+        //   D-pad ↓ (na última linha do teclado) → entra na lista de resultados
+        //   D-pad ↑ (na lista) → volta para o teclado
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
-            switch (e.Key)
+            bool isSearchOpen = SearchScreen.Visibility == Visibility.Visible;
+            bool keyboardFocused = VirtualKeyboard.IsKeyboardFocusWithin;
+            bool resultsFocused  = SearchResultList.IsKeyboardFocusWithin;
+
+            if (!isSearchOpen)
             {
-                case Key.Enter:       // A button
-                    if (IsSearchBtnActive)
-                    {
-                        OpenGameSearch();
-                    }
-                    else if (IsGameListActive)
-                    {
-                        Assign();
-                    }
-                    else // file list or anywhere else -> open search next
-                    {
-                        GameSearchButton.Focus();
-                    }
-                    e.Handled = true;
-                    break;
+                // Tela principal
+                switch (e.Key)
+                {
+                    case Key.Enter:
+                        OpenSearchScreen();
+                        e.Handled = true;
+                        break;
+                    case Key.Escape:
+                        Close();
+                        e.Handled = true;
+                        break;
+                    case Key.F1:
+                        SkipFile();
+                        e.Handled = true;
+                        break;
+                    case Key.Delete:
+                        DeleteCurrentFile();
+                        e.Handled = true;
+                        break;
+                }
+            }
+            else
+            {
+                // Tela de busca
+                switch (e.Key)
+                {
+                    case Key.Escape:
+                        CloseSearchScreen();
+                        e.Handled = true;
+                        break;
 
-                case Key.Escape:      // B button
-                    Close();
-                    e.Handled = true;
-                    break;
+                    case Key.Enter:
+                        if (resultsFocused)
+                            AssignCurrentFile();
+                        else if (keyboardFocused)
+                        {
+                            // Enter no teclado virtual já é tratado pelo Button.Click
+                            // mas como estamos interceptando, precisamos clicar manualmente
+                            var focused = Keyboard.FocusedElement as Button;
+                            if (focused != null)
+                                ProcessKey(focused.Tag as string ?? "");
+                            e.Handled = true;
+                        }
+                        break;
 
-                case Key.F1:          // Start button
-                    Skip();
-                    e.Handled = true;
-                    break;
+                    case Key.Down when resultsFocused:
+                        // Já navega pela lista nativo — não interceptar
+                        break;
 
-                case Key.Tab:
-                    // Tab cycles: file list -> search button -> game list -> file list
-                    if (IsFileListActive)
-                        GameSearchButton.Focus();
-                    else if (IsSearchBtnActive)
-                        GameList.Focus();
-                    else
-                        FileList.Focus();
-                    e.Handled = true;
-                    break;
+                    case Key.Up when resultsFocused:
+                        if (SearchResultList.SelectedIndex <= 0)
+                        {
+                            // Sobe de volta para o teclado
+                            FocusFirstKey();
+                            e.Handled = true;
+                        }
+                        break;
 
-                case Key.Left:
-                    FileList.Focus();
-                    e.Handled = true;
-                    break;
-
-                case Key.Right:
-                    GameSearchButton.Focus();
-                    e.Handled = true;
-                    break;
-
-                case Key.Down when IsSearchBtnActive:
-                    GameList.Focus();
-                    if (GameList.Items.Count > 0 && GameList.SelectedIndex < 0)
-                        GameList.SelectedIndex = 0;
-                    e.Handled = true;
-                    break;
+                    case Key.Down when keyboardFocused:
+                        // Verifica se estamos na última linha do teclado
+                        var rows = VirtualKeyboard.Children.OfType<UniformGrid>().ToList();
+                        var lastRow = rows.LastOrDefault();
+                        if (lastRow != null && lastRow.IsKeyboardFocusWithin)
+                        {
+                            // Desce para a lista de resultados
+                            SearchResultList.Focus();
+                            if (SearchResultList.Items.Count > 0)
+                                SearchResultList.SelectedIndex = 0;
+                            e.Handled = true;
+                        }
+                        break;
+                }
             }
         }
     }
