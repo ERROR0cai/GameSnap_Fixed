@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 
@@ -209,7 +210,7 @@ namespace GameSnapPlugin.Views
             {
                 case "BACK":
                     if (_searchQuery.Length > 0)
-                        _searchQuery = _searchQuery[..^1];
+                        _searchQuery = _searchQuery.Substring(0, _searchQuery.Length - 1);
                     break;
                 case "SPACE":
                     _searchQuery += " ";
