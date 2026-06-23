@@ -247,7 +247,10 @@ namespace GameSnapPlugin.Views
 
             try
             {
-                var destFolder = Path.Combine(_settings.DestinationBase, game.Name);
+                // Sanitize game name for use as folder name (same as OrganizerService)
+                var invalid    = Path.GetInvalidFileNameChars();
+                var folderName = string.Concat(game.Name.Split(invalid)).Trim();
+                var destFolder = Path.Combine(_settings.DestinationBase, folderName);
                 Directory.CreateDirectory(destFolder);
 
                 var destPath = Path.Combine(destFolder, Path.GetFileName(file.FullPath));
@@ -270,7 +273,8 @@ namespace GameSnapPlugin.Views
             }
             catch (Exception ex)
             {
-                _logger.Error($"[Fullscreen Review] Assign failed: {ex.Message}");
+                _logger.Error($"[Fullscreen Review] Assign failed: {ex.Message} | File: {file.FullPath} | Game: {game.Name} | Folder: {Path.Combine(_settings.DestinationBase, string.Concat(game.Name.Split(Path.GetInvalidFileNameChars())).Trim())}");
+                _api.Dialogs.ShowMessage($"Failed to assign: {ex.Message}", "GameSnap");
                 CloseSearchScreen();
             }
         }
