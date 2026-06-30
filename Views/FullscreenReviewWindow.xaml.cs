@@ -27,6 +27,21 @@ namespace GameSnapPlugin.Views
         }
     }
 
+    // Representa um destino possível — jogo do Playnite OU pasta existente no destino
+    public class DestinationItem
+    {
+        public string Name       { get; set; }
+        public string FolderName { get; set; } // nome sanitizado para uso no disco
+        public bool   IsFolder   { get; set; } // true = pasta existente, false = jogo Playnite
+
+        public DestinationItem(string name, string folderName, bool isFolder)
+        {
+            Name       = name;
+            FolderName = folderName;
+            IsFolder   = isFolder;
+        }
+    }
+
     public partial class FullscreenReviewWindow : Window
     {
         private readonly IPlayniteAPI      _api;
@@ -35,8 +50,8 @@ namespace GameSnapPlugin.Views
         private readonly GameSnapLogger    _logger;
 
         private ObservableCollection<UnmatchedFileItem> _files = new ObservableCollection<UnmatchedFileItem>();
-        private List<Game>                              _allGames = new List<Game>();
-        private ObservableCollection<Game>              _filteredGames = new ObservableCollection<Game>();
+        private List<DestinationItem>                   _allDestinations = new List<DestinationItem>();
+        private ObservableCollection<DestinationItem>   _filteredDestinations = new ObservableCollection<DestinationItem>();
 
         // Estado da tela de busca
         private string _searchQuery = "";
@@ -60,7 +75,7 @@ namespace GameSnapPlugin.Views
             LoadGames();
 
             FileList.ItemsSource         = _files;
-            SearchResultList.ItemsSource = _filteredGames;
+            SearchResultList.ItemsSource = _filteredDestinations;
 
             if (_files.Count > 0)
                 FileList.SelectedIndex = 0;
@@ -91,11 +106,37 @@ namespace GameSnapPlugin.Views
 
         private void LoadGames()
         {
-            _allGames = _api.Database.Games
+            var invalid = Path.GetInvalidFileNameChars();
+
+            // Pastas existentes no destino (inclui +Playnite, _Unmatched, etc.)
+            var existingFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var destinations    = new List<DestinationItem>();
+
+            if (Directory.Exists(_settings.DestinationBase))
+            {
+                foreach (var dir in Directory.GetDirectories(_settings.DestinationBase)
+                    .OrderBy(d => d))
+                {
+                    var folderName = Path.GetFileName(dir);
+                    // Pula a pasta de não identificados
+                    if (folderName == _settings.UnmatchedFolderName) continue;
+                    existingFolders.Add(folderName);
+                    destinations.Add(new DestinationItem(folderName, folderName, isFolder: true));
+                }
+            }
+
+            // Jogos do Playnite que ainda não têm pasta criada
+            foreach (var game in _api.Database.Games
                 .GroupBy(g => g.Name)
                 .Select(g => g.First())
-                .OrderBy(g => g.Name)
-                .ToList();
+                .OrderBy(g => g.Name))
+            {
+                var folderName = string.Concat(game.Name.Split(invalid)).Trim();
+                if (!existingFolders.Contains(folderName))
+                    destinations.Add(new DestinationItem(game.Name, folderName, isFolder: false));
+            }
+
+            _allDestinations = destinations.OrderBy(d => d.Name).ToList();
         }
 
         private void UpdateMainCounters()
@@ -182,16 +223,16 @@ namespace GameSnapPlugin.Views
 
         private void FilterGames()
         {
-            _filteredGames.Clear();
+            _filteredDestinations.Clear();
 
             var matches = string.IsNullOrEmpty(_searchQuery)
-                ? _allGames
-                : _allGames.Where(g => g.Name.IndexOf(_searchQuery, StringComparison.OrdinalIgnoreCase) >= 0);
+                ? _allDestinations
+                : _allDestinations.Where(d => d.Name.IndexOf(_searchQuery, StringComparison.OrdinalIgnoreCase) >= 0);
 
-            foreach (var g in matches)
-                _filteredGames.Add(g);
+            foreach (var d in matches)
+                _filteredDestinations.Add(d);
 
-            if (_filteredGames.Count > 0)
+            if (_filteredDestinations.Count > 0)
                 SearchResultList.SelectedIndex = 0;
         }
 
@@ -240,27 +281,61 @@ namespace GameSnapPlugin.Views
 
         // ── Actions ──────────────────────────────────────────────────────────────
 
+        private static string SanitizeFileName(string name)
+        {
+            var invalid = Path.GetInvalidFileNameChars();
+            return string.Concat(name.Split(invalid)).Trim();
+        }
+
+        private string BuildDestName(string gameName, string originalPath)
+        {
+            var ext      = Path.GetExtension(originalPath);
+            var original = Path.GetFileNameWithoutExtension(originalPath);
+            var info     = new FileInfo(originalPath);
+            var date     = info.LastWriteTime;
+
+            var pattern = string.IsNullOrWhiteSpace(_settings.RenamePattern)
+                ? "{game}_{date}_{time}"
+                : _settings.RenamePattern;
+
+            return pattern
+                .Replace("{game}",     SanitizeFileName(gameName))
+                .Replace("{date}",     date.ToString("yyyy-MM-dd"))
+                .Replace("{time}",     date.ToString("HH_mm_ss"))
+                .Replace("{datetime}", date.ToString("yyyy-MM-dd_HH_mm_ss"))
+                .Replace("{original}", SanitizeFileName(original))
+                + ext;
+        }
+
         private void AssignCurrentFile()
         {
             if (FileList.SelectedItem is not UnmatchedFileItem file) return;
-            if (SearchResultList.SelectedItem is not Game game) return;
+            if (SearchResultList.SelectedItem is not DestinationItem dest) return;
 
             try
             {
-                // Sanitize game name for use as folder name (same as OrganizerService)
-                var invalid    = Path.GetInvalidFileNameChars();
-                var folderName = string.Concat(game.Name.Split(invalid)).Trim();
-                var destFolder = Path.Combine(_settings.DestinationBase, folderName);
+                var destFolder = Path.Combine(_settings.DestinationBase, dest.FolderName);
                 Directory.CreateDirectory(destFolder);
 
-                var destPath = Path.Combine(destFolder, Path.GetFileName(file.FullPath));
+                // Aplica o RenamePattern (igual ao OrganizerService)
+                var newFileName = BuildDestName(dest.Name, file.FullPath);
+                var destPath    = Path.Combine(destFolder, newFileName);
+
+                // Evita sobrescrever arquivo existente
+                if (File.Exists(destPath))
+                {
+                    var stem = Path.GetFileNameWithoutExtension(newFileName);
+                    var ext  = Path.GetExtension(newFileName);
+                    destPath = Path.Combine(destFolder, $"{stem}_{Guid.NewGuid().ToString("N").Substring(0, 6)}{ext}");
+                }
+
                 File.Move(file.FullPath, destPath);
 
                 var prefix = Path.GetFileNameWithoutExtension(file.FileName).Split('_')[0];
                 if (!string.IsNullOrWhiteSpace(prefix))
-                    _dict.SaveAlias(prefix, game.Name);
+                    _dict.SaveAlias(prefix, dest.Name);
 
-                _logger.Info($"[Fullscreen Review] {file.FileName} -> {game.Name}");
+                _logger.Info($"[Fullscreen Review] {file.FileName} -> {dest.FolderName}/{newFileName}");
 
                 _files.Remove(file);
                 UpdateMainCounters();
@@ -273,7 +348,7 @@ namespace GameSnapPlugin.Views
             }
             catch (Exception ex)
             {
-                _logger.Error($"[Fullscreen Review] Assign failed: {ex.Message} | File: {file.FullPath} | Game: {game.Name} | Folder: {Path.Combine(_settings.DestinationBase, string.Concat(game.Name.Split(Path.GetInvalidFileNameChars())).Trim())}");
+                _logger.Error($"[Fullscreen Review] Assign failed: {ex.Message} | File: {file.FullPath} | Dest: {dest?.Name}");
                 _api.Dialogs.ShowMessage($"Failed to assign: {ex.Message}", "GameSnap");
                 CloseSearchScreen();
             }
