@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +15,10 @@ namespace GameSnapPlugin
         private FileSystemWatcher? _watcher;
         private Timer?             _pollingTimer;
         private bool               _disposed;
+
+        // Debounce — evita processar o mesmo arquivo duas vezes em < 5s
+        private readonly ConcurrentDictionary<string, DateTime> _recentlyProcessed
+            = new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
 
         public WatcherService(GameSnapSettings settings, OrganizerService organizer, GameSnapLogger logger)
         {
@@ -65,7 +70,22 @@ namespace GameSnapPlugin
 
         private void OnFileCreated(object sender, FileSystemEventArgs e)
         {
-            // Delay then organize fully off the watcher thread — never blocks Playnite
+            var path = e.FullPath;
+
+            // Debounce: ignorar se já processamos este arquivo nos últimos 5 segundos
+            var now = DateTime.UtcNow;
+            if (_recentlyProcessed.TryGetValue(path, out var lastSeen) &&
+                (now - lastSeen).TotalSeconds < 5)
+                return;
+
+            _recentlyProcessed[path] = now;
+
+            // Limpa entradas antigas do debounce (> 30s) para não acumular memória
+            foreach (var key in _recentlyProcessed.Keys)
+                if ((now - _recentlyProcessed[key]).TotalSeconds > 30)
+                    _recentlyProcessed.TryRemove(key, out _);
+
+            // Delay de 2s para o arquivo terminar de ser escrito antes de processar
             Task.Delay(2000).ContinueWith(_ =>
                 Task.Run(() => SafeOrganize()));
         }

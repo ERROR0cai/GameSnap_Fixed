@@ -66,6 +66,27 @@ namespace GameSnapPlugin
         /// Saves a learned alias to dictionary.txt.
         /// Creates the file with a header if it does not exist.
         /// </summary>
+        // Prefixo válido: só letras, dígitos e alguns caracteres especiais seguros.
+        // Rejeita: datas (2026-05-30), timestamps (%t ...), nomes muito curtos.
+        private static bool IsValidPrefix(string prefix)
+        {
+            if (string.IsNullOrWhiteSpace(prefix)) return false;
+            if (prefix.Length < 2) return false;
+
+            // Rejeita se começa com % (artefatos do ShareX como %t, %d)
+            if (prefix.StartsWith("%")) return false;
+
+            // Rejeita se parece uma data (4 dígitos + traço)
+            if (prefix.Length >= 4 && char.IsDigit(prefix[0]) && char.IsDigit(prefix[1]) &&
+                char.IsDigit(prefix[2]) && char.IsDigit(prefix[3]))
+                return false;
+
+            // Rejeita se tem mais de 60 caracteres (provavelmente nome de arquivo completo)
+            if (prefix.Length > 60) return false;
+
+            return true;
+        }
+
         public void SaveAlias(string prefix, string gameName)
         {
             if (string.IsNullOrWhiteSpace(prefix) || string.IsNullOrWhiteSpace(gameName))
@@ -73,6 +94,9 @@ namespace GameSnapPlugin
 
             prefix   = prefix.Trim();
             gameName = gameName.Trim();
+
+            // Rejeita prefixos inválidos (datas, artefatos do ShareX, etc.)
+            if (!IsValidPrefix(prefix)) return;
 
             // Don't save if already known
             var existing = Load();
