@@ -97,6 +97,11 @@
             <TextBlock Style="{StaticResource TipLabel}"
                        Text="Secondary detection using the active window title. Less reliable — use Playnite detection when possible."/>
 
+            <TextBlock Text="Emulator process prefixes (comma-separated)" Margin="0,8,0,4"/>
+            <TextBox Text="{Binding EmulatorPrefixesText, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Style="{StaticResource TipLabel}"
+                       Text="Files whose name starts with one of these prefixes (e.g. 'retroarch') skip the dictionary and active-window detection entirely and use only the game currently running in Playnite. Use this for emulators that only expose the core name (not the ROM name) in the window title/process — otherwise the dictionary would learn the wrong game and keep reusing it for every ROM."/>
+
             <CheckBox Content="Auto-create game folders when a game starts"
                       IsChecked="{Binding Settings.AutoCreateFolders}"
                       Margin="0,0,0,4"

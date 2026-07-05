@@ -79,6 +79,13 @@ namespace GameSnapPlugin
 
         private List<string> _windowBlacklist = new List<string>();
         public List<string> WindowBlacklist { get => _windowBlacklist; set => SetValue(ref _windowBlacklist, value); }
+
+        // Prefixos de arquivo (ex: nome do processo capturado pelo ShareX) que sempre
+        // pulam dicionário e janela ativa, usando só o jogo ativo do Playnite.
+        // Resolve o problema de core-only emulators (RetroArch etc.) onde o prefixo
+        // do arquivo é sempre o mesmo independente da ROM rodando.
+        private List<string> _emulatorPrefixes = new List<string>();
+        public List<string> EmulatorPrefixes { get => _emulatorPrefixes; set => SetValue(ref _emulatorPrefixes, value); }
     }
 
     public class GameSnapSettingsViewModel : ObservableObject, ISettings
@@ -124,6 +131,13 @@ namespace GameSnapPlugin
                     "discord", "steam", "launcher", "update", "setup",
                     "windows", "desktop", "playnite", "visual studio",
                     "code", "powershell", "cmd", "terminal"
+                };
+
+            if (Settings.EmulatorPrefixes.Count == 0)
+                Settings.EmulatorPrefixes = new List<string>
+                {
+                    "retroarch", "pcsx2", "dolphin", "rpcs3",
+                    "cemu", "ppsspp", "mgba", "duckstation"
                 };
 
             // Emulator profiles: usa salvos ou cria defaults
@@ -197,6 +211,21 @@ namespace GameSnapPlugin
                     .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                     .Select(s => s.Trim().ToLowerInvariant())
                     .Where(s => s.StartsWith("."))
+                    .ToList();
+                OnPropertyChanged();
+            }
+        }
+
+        [DontSerialize]
+        public string EmulatorPrefixesText
+        {
+            get => string.Join(", ", Settings.EmulatorPrefixes);
+            set
+            {
+                Settings.EmulatorPrefixes = value
+                    .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim().ToLowerInvariant())
+                    .Where(s => !string.IsNullOrEmpty(s))
                     .ToList();
                 OnPropertyChanged();
             }

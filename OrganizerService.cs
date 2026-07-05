@@ -298,8 +298,31 @@ namespace GameSnapPlugin
             string? game   = null;
             string  method = "UNKNOWN";
 
+            // 0. Bypass de emulador — prefixos como "retroarch" identificam o CORE, não a ROM.
+            // Um único prefixo serve pra vários jogos diferentes, então dicionário e janela
+            // ativa não podem ser usados (nem aprendidos) para esses prefixos: a única fonte
+            // confiável é o jogo que o Playnite diz estar rodando agora.
+            bool isEmulatorPrefix = _settings.EmulatorPrefixes
+                .Any(p => normPfx.Equals(DictionaryService.Normalize(p), StringComparison.OrdinalIgnoreCase));
+
+            if (isEmulatorPrefix)
+            {
+                if (!string.IsNullOrEmpty(_currentGame))
+                {
+                    game   = _currentGame;
+                    method = "EMULATOR-PLAYNITE";
+                }
+                else
+                {
+                    _logger.Write(LogType.Error,
+                        $"File: {fileName}\nReason: Emulator prefix '{prefix}' but no active Playnite game");
+                    TryMoveToUnmatched(filePath, ext);
+                    return;
+                }
+            }
+
             // 1. Dicionário
-            if (dict.TryGetValue(normPfx, out var fromDict))
+            if (game == null && dict.TryGetValue(normPfx, out var fromDict))
             {
                 game   = fromDict;
                 method = "DICTIONARY";
@@ -318,7 +341,9 @@ namespace GameSnapPlugin
                 }
             }
 
-            // 3. Janela ativa
+            // 3. Janela ativa — nunca roda para prefixos de emulador (isEmulatorPrefix já
+            // retornou acima quando não há jogo ativo, então chegar aqui com game == null
+            // e isEmulatorPrefix == true não deveria acontecer, mas o guard abaixo garante isso.
             // Opção D: só ativa durante sessão de jogo (entre OnGameStarted e OnGameStopped)
             // Opção C: só ativa se o prefixo já existe no dicionário (jogo conhecido fora do Playnite)
             bool inGameSession  = _currentGame != null;
