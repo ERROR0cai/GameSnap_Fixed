@@ -5,6 +5,22 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.2] — 2026-07-05
+
+### Fixed
+- **Emulator folder scanning had no effect** — `EmulatorService` was never instantiated
+  or assigned to `OrganizerService.EmulatorService` in `GameSnapPlugin.InitServices`,
+  so `OrganizeEmulators()` always returned immediately regardless of settings. Now
+  wired up the same way as `SteamService`, gated by **Enable emulator screenshot
+  support**.
+
+### Documentation
+- Updated README: folder-scanning emulator support is now functional and documented
+  as a complementary automatic path alongside Emulator process prefixes, for emulators
+  where the native in-emulator screenshot function is used instead of ShareX.
+
+---
+
 ## [1.4.1] — 2026-07-05
 
 ### Added

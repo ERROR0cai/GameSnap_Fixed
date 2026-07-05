@@ -26,6 +26,7 @@ namespace GameSnapPlugin
         private OrganizerService?  _organizer;
         private WatcherService?    _watcher;
         private SteamService?      _steam;
+        private EmulatorService?   _emulator;
 
         public GameSnapPlugin(IPlayniteAPI api) : base(api)
         {
@@ -146,6 +147,17 @@ namespace GameSnapPlugin
             {
                 _steam = null;
                 _organizer.SteamService = null;
+            }
+
+            if (s.EnableEmulatorSupport)
+            {
+                _emulator = new EmulatorService(PlayniteApi, s, _logger);
+                _organizer.EmulatorService = _emulator;
+            }
+            else
+            {
+                _emulator = null;
+                _organizer.EmulatorService = null;
             }
 
             _organizer.OnFileMoved = (summary, message) =>

@@ -129,11 +129,15 @@ Configure this in **Settings → Detection → Emulator process prefixes** (comm
 
 ---
 
-## Emulator support (folder scanning) — experimental, currently inactive
+## Emulator support (folder scanning)
 
-Settings → Emulators lets you point GameSnap at each emulator's own screenshot folder (e.g. `%AppData%\RetroArch\screenshots`) as an alternative to the drop-folder + prefix approach above.
+Settings → Emulators lets you point GameSnap directly at each emulator's own screenshot folder (e.g. `%AppData%\RetroArch\screenshots`, or wherever RetroBat redirects it) as an **automatic, second capture path** alongside the drop-folder approach above — the same idea as ScreenshotsVisualizer.
 
-**This feature is not currently wired up and has no effect even when enabled** — it's kept in the codebase for a possible future revisit, but don't rely on it today. Use [Emulator process prefixes](#emulator-process-prefixes) instead.
+This is a good fit for emulators like RetroArch, where the emulator's own screenshot function already embeds the ROM name in the filename (`RomName-Date-Numbers.png`), so no detection guesswork is needed — GameSnap just reads the folder, matches the filename to your Playnite library, and moves it. It also avoids any capture-tool latency, since it reads what the emulator itself saved rather than relying on an external hotkey capture.
+
+You can use this together with [Emulator process prefixes](#emulator-process-prefixes): folder scanning for emulators where you use the native in-emulator screenshot function, and the prefix bypass for anything still captured through ShareX/Xbox Game Bar.
+
+Supported out of the box: RetroArch, PCSX2, Dolphin, RPCS3, Cemu, PPSSPP, mGBA, DuckStation. Custom emulators can be added with the **+ Add emulator** button. Each entry needs its checkbox enabled and either an auto-detected path or a custom one.
 
 ---
 
