@@ -186,7 +186,34 @@ namespace GameSnapPlugin
             foreach (var game in _playniteApi.Database.Games)
             {
                 var normGame = DictionaryService.Normalize(game.Name);
-                if (normGame == norm) return game.Name; // exact match
+                if (normGame == norm) return game.Name; // exact title match
+
+                // Exact match against the actual ROM filename Playnite has on record.
+                // Emulator screenshot filenames are usually the raw ROM filename
+                // ("mslug", "garou"), which rarely resembles the display title —
+                // this catches those automatically, no dictionary alias needed.
+                // Depending on how the game was imported, the ROM path can live in
+                // Roms (multi-file/ROM-scan imports) or in GameActions (Play action
+                // pointing straight at the file) — check both.
+                if (game.Roms != null)
+                {
+                    foreach (var rom in game.Roms)
+                    {
+                        if (string.IsNullOrEmpty(rom.Path)) continue;
+                        var romName = DictionaryService.Normalize(Path.GetFileNameWithoutExtension(rom.Path));
+                        if (!string.IsNullOrEmpty(romName) && romName == norm) return game.Name;
+                    }
+                }
+
+                if (game.GameActions != null)
+                {
+                    foreach (var action in game.GameActions)
+                    {
+                        if (string.IsNullOrEmpty(action.Path)) continue;
+                        var actionName = DictionaryService.Normalize(Path.GetFileNameWithoutExtension(action.Path));
+                        if (!string.IsNullOrEmpty(actionName) && actionName == norm) return game.Name;
+                    }
+                }
 
                 if (normGame.Contains(norm) || norm.Contains(normGame))
                 {

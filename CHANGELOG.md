@@ -5,6 +5,29 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.6] — 2026-07-05
+
+### Fixed
+- **ROM-filename matching (1.4.5) still missed some games** — `Game.Roms` is empty for
+  games imported in a way that stores the launch path in `GameActions` instead (common
+  depending on how RetroBat/Playnite integration added the game). `FindPlayniteGame` now
+  also checks each `GameAction.Path`, so `mslug` resolves correctly regardless of which
+  field Playnite used to store the ROM path.
+
+---
+
+## [1.4.5] — 2026-07-05
+
+### Added
+- **Emulator matching now checks the actual ROM filename** Playnite has on record for
+  each game (`Game.Roms`), not just the display title. Fixes automatic resolution of
+  arcade/Neo Geo ROM internal short names (`mslug`, `garou`, etc.) without requiring a
+  manual dictionary alias — the previous release (1.4.4) required one for every such
+  ROM, which wasn't sustainable. The dictionary is still consulted as a fallback for
+  games added without a linked ROM file.
+
+---
+
 ## [1.4.4] — 2026-07-05
 
 ### Added
