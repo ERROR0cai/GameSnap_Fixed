@@ -46,13 +46,15 @@ namespace GameSnapPlugin
 
         public void Organize()
         {
+            var dict = _dictionary.Load();
+
             // Steam screenshots
             if (_settings.EnableSteamSupport && SteamService != null)
                 OrganizeSteam();
 
             // Emulator screenshots
             if (_settings.EnableEmulatorSupport && EmulatorService != null)
-                OrganizeEmulators();
+                OrganizeEmulators(dict);
 
             var allSources = new List<string>();
 
@@ -65,7 +67,6 @@ namespace GameSnapPlugin
             if (allSources.Count == 0) return;
             if (!Directory.Exists(_settings.DestinationBase)) return;
 
-            var dict    = _dictionary.Load();
             var folders = LoadFolders();
             var counts  = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
@@ -186,7 +187,7 @@ namespace GameSnapPlugin
         // ──────────────────────────────────────────────
         // Emulators
         // ──────────────────────────────────────────────
-        private void OrganizeEmulators()
+        private void OrganizeEmulators(Dictionary<string, string> dict)
         {
             if (EmulatorService == null) return;
 
@@ -200,7 +201,17 @@ namespace GameSnapPlugin
             {
                 if (_processed.Contains(ss.FilePath)) continue;
 
-                var normGame = DictionaryService.Normalize(ss.GameName);
+                // Consulta o dicionário primeiro — resolve nomes internos de ROM
+                // (ex: "mslug", "garou") que não batem por aproximação com o
+                // título de exibição do Playnite. Mesmo dicionário usado pelo
+                // fluxo do ShareX (WindowFallback/Playnite), sem aprendizado
+                // automático aqui (o resolvedor de emulador já é mais específico).
+                var resolvedName = ss.GameName;
+                var normCandidate = DictionaryService.Normalize(ss.GameName);
+                if (dict.TryGetValue(normCandidate, out var fromDict))
+                    resolvedName = fromDict;
+
+                var normGame = DictionaryService.Normalize(resolvedName);
                 var match = folders
                     .Where(f => f.NameNorm.Contains(normGame) || normGame.Contains(f.NameNorm))
                     .OrderByDescending(f => f.NameNorm.Length)
@@ -212,7 +223,7 @@ namespace GameSnapPlugin
                     if (_settings.AutoCreateFolders)
                     {
                         var invalid    = Path.GetInvalidFileNameChars();
-                        var folderName = string.Concat(ss.GameName.Split(invalid)).Trim();
+                        var folderName = string.Concat(resolvedName.Split(invalid)).Trim();
                         var newPath    = Path.Combine(_settings.DestinationBase, folderName);
                         Directory.CreateDirectory(newPath);
                         folders = LoadFolders(); // refresh
@@ -223,7 +234,7 @@ namespace GameSnapPlugin
                     if (match == null)
                     {
                         _logger.Write(LogType.Error,
-                            $"Emulator [{ss.Emulator}]: No folder for '{ss.GameName}'. File: {Path.GetFileName(ss.FilePath)}");
+                            $"Emulator [{ss.Emulator}]: No folder for '{resolvedName}'. File: {Path.GetFileName(ss.FilePath)}");
                         TryMoveToUnmatched(ss.FilePath, Path.GetExtension(ss.FilePath).ToLowerInvariant());
                         continue;
                     }
