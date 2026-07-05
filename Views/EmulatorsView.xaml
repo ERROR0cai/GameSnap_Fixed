@@ -44,7 +44,8 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Border Margin="0,0,0,8" Padding="12,10"
-                                BorderThickness="1" CornerRadius="4">
+                                BorderThickness="1" CornerRadius="4"
+                                ToolTip="This reads the emulator's own native screenshot folder. Screenshots must be taken with the emulator's built-in screenshot function (e.g. F9 in RetroArch) — captures made with ShareX or Xbox Game Bar won't show up here. For those, use 'Emulator process prefixes' in the Detection tab instead.">
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Setter Property="BorderBrush" Value="#333"/>

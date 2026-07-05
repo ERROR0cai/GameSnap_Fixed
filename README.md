@@ -135,11 +135,13 @@ Settings → Emulators lets you point GameSnap directly at each emulator's own s
 
 This is a good fit for emulators like RetroArch, where the emulator's own screenshot function already embeds the ROM name in the filename (`RomName-Date-Numbers.png`), so no detection guesswork is needed — GameSnap just reads the folder, matches the filename to your Playnite library, and moves it. It also avoids any capture-tool latency, since it reads what the emulator itself saved rather than relying on an external hotkey capture.
 
+> **Requirement:** screenshots must be taken with the emulator's own built-in screenshot function (e.g. **F9** in RetroArch by default). Captures made with ShareX or Xbox Game Bar are saved to a different folder and won't be picked up by this feature — use [Emulator process prefixes](#emulator-process-prefixes) for those instead.
+
 You can use this together with [Emulator process prefixes](#emulator-process-prefixes): folder scanning for emulators where you use the native in-emulator screenshot function, and the prefix bypass for anything still captured through ShareX/Xbox Game Bar.
 
 Supported out of the box: RetroArch, PCSX2, Dolphin, RPCS3, Cemu, PPSSPP, mGBA, DuckStation. Custom emulators can be added with the **+ Add emulator** button. Each entry needs its checkbox enabled and either an auto-detected path or a custom one.
 
-**ROM internal names:** many arcade/Neo Geo ROMs save screenshots using their internal short name (`mslug`, `garou`, `kof98`...) instead of the full display title, which won't fuzzy-match your Playnite library. Add an alias to the same `dictionary.txt` you already use for PC games:
+**ROM internal names:** many arcade/Neo Geo ROMs save screenshots using their internal short name (`mslug`, `garou`, `kof98`...) instead of the full display title. GameSnap now matches this automatically against the actual ROM filename Playnite has on record for each game — checking both the `Roms` list and each `GameAction`'s path, since different import methods store it in different places — so no manual alias is needed in the common case. If a game was added to Playnite without any linked ROM file (or the filename genuinely doesn't match), you can still add a fallback alias to the same `dictionary.txt` you use for PC games:
 ```
 [Metal Slug X - Super Vehicle-001]
 mslug

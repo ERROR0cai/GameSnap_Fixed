@@ -5,6 +5,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.7] — 2026-07-05
+
+### Added
+- New plugin icon.
+- Tooltip on each row in Settings → Emulators clarifying that screenshots must be
+  taken with the emulator's own native screenshot function — ShareX/Xbox Game Bar
+  captures won't be picked up by folder scanning.
+
+### Documentation
+- README: added an explicit requirement callout for native capture in the Emulator
+  support section, and clarified that ROM-filename matching checks both `Roms` and
+  `GameActions`.
+
+---
+
 ## [1.4.6] — 2026-07-05
 
 ### Fixed
