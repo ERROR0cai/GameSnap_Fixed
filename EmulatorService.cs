@@ -120,7 +120,12 @@ namespace GameSnapPlugin
         // ──────────────────────────────────────────────
         private string? ResolveGameName(string filePath, string emulatorName)
         {
-            // Strategy 1: file is inside a subfolder named after the game
+            // Strategy 1: file is inside a subfolder named after the game.
+            // IMPORTANT: only trust this if the folder name actually matches something in
+            // the Playnite library. RetroBat/RetroArch commonly organize screenshots into
+            // subfolders named after the SYSTEM/CORE (e.g. "pcsx2", "duckstation",
+            // "screenshots"), not the game — blindly using an unmatched folder name here
+            // creates bogus folders named after cores instead of games.
             var parent = Path.GetFileName(Path.GetDirectoryName(filePath) ?? "");
             if (!string.IsNullOrEmpty(parent) &&
                 !parent.Equals(emulatorName, StringComparison.OrdinalIgnoreCase) &&
@@ -128,7 +133,7 @@ namespace GameSnapPlugin
             {
                 var match = FindPlayniteGame(parent);
                 if (match != null) return match;
-                return CleanRomName(parent);
+                // No match — don't trust the folder name, fall through to filename parsing.
             }
 
             // Strategy 2: filename starts with game name (RetroArch: GameName_YYYY-MM-DD.png)

@@ -5,6 +5,33 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.4] — 2026-07-05
+
+### Added
+- **Emulator folder scanning now consults `dictionary.txt`** before matching against
+  the Playnite library or existing folders. Many arcade/Neo Geo ROMs save native
+  screenshots using their internal short name (`mslug`, `garou`, `matrim`...) instead
+  of the display title, which doesn't fuzzy-match Playnite's game names — these can
+  now be mapped with a normal dictionary alias, same as the ShareX flow. No
+  auto-learning here (unlike the ShareX/Playnite path); aliases must be added manually.
+
+---
+
+## [1.4.3] — 2026-07-05
+
+### Fixed
+- **Emulator folder scanning created folders named after cores/systems** —
+  `ResolveGameName` trusted any subfolder name as the game name, even when it
+  didn't match anything in the Playnite library. RetroBat organizes native
+  screenshots into subfolders named after the **system/core** (e.g. `pcsx2`,
+  `duckstation`, `screenshots`), not the game, which created bogus folders
+  named after those cores. The subfolder name is now only used when it
+  actually matches a game in the Playnite library; otherwise resolution falls
+  through to filename-based parsing (the reliable `RomName-Date-...`
+  convention RetroArch itself uses).
+
+---
+
 ## [1.4.2] — 2026-07-05
 
 ### Fixed
