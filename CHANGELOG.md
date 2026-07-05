@@ -5,87 +5,6 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.4.7] — 2026-07-05
-
-### Added
-- New plugin icon.
-- Tooltip on each row in Settings → Emulators clarifying that screenshots must be
-  taken with the emulator's own native screenshot function — ShareX/Xbox Game Bar
-  captures won't be picked up by folder scanning.
-
-### Documentation
-- README: added an explicit requirement callout for native capture in the Emulator
-  support section, and clarified that ROM-filename matching checks both `Roms` and
-  `GameActions`.
-
----
-
-## [1.4.6] — 2026-07-05
-
-### Fixed
-- **ROM-filename matching (1.4.5) still missed some games** — `Game.Roms` is empty for
-  games imported in a way that stores the launch path in `GameActions` instead (common
-  depending on how RetroBat/Playnite integration added the game). `FindPlayniteGame` now
-  also checks each `GameAction.Path`, so `mslug` resolves correctly regardless of which
-  field Playnite used to store the ROM path.
-
----
-
-## [1.4.5] — 2026-07-05
-
-### Added
-- **Emulator matching now checks the actual ROM filename** Playnite has on record for
-  each game (`Game.Roms`), not just the display title. Fixes automatic resolution of
-  arcade/Neo Geo ROM internal short names (`mslug`, `garou`, etc.) without requiring a
-  manual dictionary alias — the previous release (1.4.4) required one for every such
-  ROM, which wasn't sustainable. The dictionary is still consulted as a fallback for
-  games added without a linked ROM file.
-
----
-
-## [1.4.4] — 2026-07-05
-
-### Added
-- **Emulator folder scanning now consults `dictionary.txt`** before matching against
-  the Playnite library or existing folders. Many arcade/Neo Geo ROMs save native
-  screenshots using their internal short name (`mslug`, `garou`, `matrim`...) instead
-  of the display title, which doesn't fuzzy-match Playnite's game names — these can
-  now be mapped with a normal dictionary alias, same as the ShareX flow. No
-  auto-learning here (unlike the ShareX/Playnite path); aliases must be added manually.
-
----
-
-## [1.4.3] — 2026-07-05
-
-### Fixed
-- **Emulator folder scanning created folders named after cores/systems** —
-  `ResolveGameName` trusted any subfolder name as the game name, even when it
-  didn't match anything in the Playnite library. RetroBat organizes native
-  screenshots into subfolders named after the **system/core** (e.g. `pcsx2`,
-  `duckstation`, `screenshots`), not the game, which created bogus folders
-  named after those cores. The subfolder name is now only used when it
-  actually matches a game in the Playnite library; otherwise resolution falls
-  through to filename-based parsing (the reliable `RomName-Date-...`
-  convention RetroArch itself uses).
-
----
-
-## [1.4.2] — 2026-07-05
-
-### Fixed
-- **Emulator folder scanning had no effect** — `EmulatorService` was never instantiated
-  or assigned to `OrganizerService.EmulatorService` in `GameSnapPlugin.InitServices`,
-  so `OrganizeEmulators()` always returned immediately regardless of settings. Now
-  wired up the same way as `SteamService`, gated by **Enable emulator screenshot
-  support**.
-
-### Documentation
-- Updated README: folder-scanning emulator support is now functional and documented
-  as a complementary automatic path alongside Emulator process prefixes, for emulators
-  where the native in-emulator screenshot function is used instead of ShareX.
-
----
-
 ## [1.4.1] — 2026-07-05
 
 ### Added
@@ -96,11 +15,40 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   RetroBat, etc.) where the window title/process name only shows the core, not the ROM —
   which previously caused the dictionary to learn the first ROM detected and reuse that
   folder for every subsequent ROM using the same core.
+- **Emulator folder scanning now consults `dictionary.txt`** before matching against the
+  Playnite library or existing folders, as a fallback for games added without a linked
+  ROM file.
+- **Emulator matching now checks the actual ROM filename** Playnite has on record for
+  each game — both `Game.Roms` and each `GameAction.Path`, since different import
+  methods store it in different places. Fixes automatic resolution of arcade/Neo Geo
+  ROM internal short names (`mslug`, `garou`, etc.) with no manual dictionary alias
+  needed in the common case.
+- New plugin icon.
+- Tooltip on each row in Settings → Emulators clarifying that screenshots must be
+  taken with the emulator's own native screenshot function — ShareX/Xbox Game Bar
+  captures won't be picked up by folder scanning.
+
+### Fixed
+- **Emulator folder scanning had no effect** — `EmulatorService` was never instantiated
+  or assigned to `OrganizerService.EmulatorService` in `GameSnapPlugin.InitServices`,
+  so `OrganizeEmulators()` always returned immediately regardless of settings. Now
+  wired up the same way as `SteamService`, gated by **Enable emulator screenshot
+  support**.
+- **Emulator folder scanning created folders named after cores/systems** —
+  `ResolveGameName` trusted any subfolder name as the game name, even when it didn't
+  match anything in the Playnite library. RetroBat organizes native screenshots into
+  subfolders named after the **system/core** (e.g. `pcsx2`, `duckstation`,
+  `screenshots`), not the game, which created bogus folders named after those cores.
+  The subfolder name is now only used when it actually matches a game in the Playnite
+  library; otherwise resolution falls through to filename-based parsing (the reliable
+  `RomName-Date-...` convention RetroArch itself uses).
 
 ### Documentation
-- Clarified in README that the folder-scanning **Emulator support** feature
-  (Settings → Emulators) is currently not wired into the plugin and has no effect even
-  when enabled; recommended using Emulator process prefixes instead.
+- Updated README: folder-scanning emulator support is now functional and documented
+  as a complementary automatic path alongside Emulator process prefixes, for emulators
+  where the native in-emulator screenshot function is used instead of ShareX, with an
+  explicit requirement callout for native capture and a note that ROM-filename
+  matching checks both `Roms` and `GameActions`.
 - Added troubleshooting entry for the "every emulator screenshot lands in the same
   folder" symptom.
 
