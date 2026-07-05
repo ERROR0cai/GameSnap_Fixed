@@ -5,9 +5,34 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.1] — 2026-07-05
+
+### Added
+- **Emulator process prefixes** — new setting (Settings → Detection) listing filename
+  prefixes (default: `retroarch, pcsx2, dolphin, rpcs3, cemu, ppsspp, mgba, duckstation`)
+  that skip dictionary and active-window detection entirely and use only the game
+  currently reported as running by Playnite. Fixes core-only emulators (RetroArch under
+  RetroBat, etc.) where the window title/process name only shows the core, not the ROM —
+  which previously caused the dictionary to learn the first ROM detected and reuse that
+  folder for every subsequent ROM using the same core.
+
+### Documentation
+- Clarified in README that the folder-scanning **Emulator support** feature
+  (Settings → Emulators) is currently not wired into the plugin and has no effect even
+  when enabled; recommended using Emulator process prefixes instead.
+- Added troubleshooting entry for the "every emulator screenshot lands in the same
+  folder" symptom.
+
+---
+
 ## [1.4.0] — 2026-06-08
 
 ### Added
+- **Fullscreen Review window for gamepad** — new "Review unmatched
+  screenshots (Fullscreen / Gamepad)" menu item opens a black fullscreen
+  window designed for TV/couch use; Xbox controller support via Windows
+  XInput mapping (A = Assign, B = Close, Start = Skip, D-pad = Navigate)
+
 - **ScreenshotsVisualizer auto-refresh toggle** — new option in Settings under
   a dedicated ScreenshotsVisualizer section (disabled by default); when enabled,
   GameSnap notifies ScreenshotsVisualizer to rescan each affected game after

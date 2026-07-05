@@ -17,10 +17,11 @@ A [Playnite](https://playnite.link/) plugin that **automatically organizes your 
 
 GameSnap watches a single "drop folder" where all your screenshots land, regardless of which tool captured them. When a new file appears, it:
 
-1. Checks the **dictionary** for a known alias → moves to the matching game folder
-2. Falls back to **Playnite's currently running game** → moves and learns the alias for next time
-3. Falls back to the **active window title** → moves and logs the detection
-4. If nothing matches → moves to `_Unmatched` folder for manual review
+1. Checks if the filename prefix matches a known **emulator process** (e.g. `retroarch`) → skips the dictionary and window detection entirely and uses only the game currently running in Playnite (see [Emulator process prefixes](#emulator-process-prefixes) below)
+2. Checks the **dictionary** for a known alias → moves to the matching game folder
+3. Falls back to **Playnite's currently running game** → moves and learns the alias for next time
+4. Falls back to the **active window title** → moves and logs the detection
+5. If nothing matches → moves to `_Unmatched` folder for manual review
 
 Everything runs natively inside Playnite — no background `.ps1` scripts, no `.vbs` launchers, no manual setup in the Scripts tab.
 
@@ -72,6 +73,7 @@ In Playnite, go to **Add-ons → GameSnap → Settings** and fill in:
 | Destination base | The parent folder that contains your per-game subfolders |
 | Use Playnite detection | Recommended — identifies the game while it's running |
 | Use active window fallback | Secondary detection when no game is active in Playnite |
+| Emulator process prefixes | Filename prefixes (e.g. `retroarch`) that bypass dictionary/window detection and use only the active Playnite game — see [Emulator process prefixes](#emulator-process-prefixes) |
 | Auto-create game folders | Automatically creates a subfolder when a new game is played |
 
 ### Step 3 — Create your game folders
@@ -113,13 +115,25 @@ This single setting covers your entire library without configuring each game ind
 
 ---
 
-## Emulator support
+## Emulator process prefixes
 
-GameSnap can monitor screenshot folders from emulators and organize them alongside your PC game screenshots. Enable it in **Settings → Emulators**.
+Some emulators (RetroArch running under RetroBat is the main case) only expose the **core name** in their window title and process name — not the ROM/game name. `RetroArch Snes9x 1.63 ...` looks the same whether you're playing *Demon's Crest* or *Super Mario World*.
 
-Supported out of the box: RetroArch, PCSX2, Dolphin, RPCS3, Cemu, PPSSPP, mGBA, DuckStation.
+If you let GameSnap's normal dictionary/window detection handle these screenshots, it will learn the **first** game it sees for that prefix (e.g. `retroarch → Demon's Crest`) and then keep reusing that same folder for every future ROM — even though the dictionary was doing exactly what it's designed to do.
 
-Custom emulators can be added with the **+ Add emulator** button.
+**Emulator process prefixes** fixes this: any filename that starts with a configured prefix skips the dictionary and window-title detection entirely and is placed using **only** the game Playnite currently reports as running. If no game is active in Playnite, the file goes to `_Unmatched` instead of guessing.
+
+Configure this in **Settings → Detection → Emulator process prefixes** (comma-separated). Defaults: `retroarch, pcsx2, dolphin, rpcs3, cemu, ppsspp, mgba, duckstation`.
+
+> **Requirement:** this only works while the game is actually running through Playnite (so it knows which game is active). It does **not** require ShareX/Xbox Game Bar to see the ROM name — Playnite is the source of truth for these prefixes.
+
+---
+
+## Emulator support (folder scanning) — experimental, currently inactive
+
+Settings → Emulators lets you point GameSnap at each emulator's own screenshot folder (e.g. `%AppData%\RetroArch\screenshots`) as an alternative to the drop-folder + prefix approach above.
+
+**This feature is not currently wired up and has no effect even when enabled** — it's kept in the codebase for a possible future revisit, but don't rely on it today. Use [Emulator process prefixes](#emulator-process-prefixes) instead.
 
 ---
 
@@ -163,6 +177,9 @@ GameSnap **learns automatically** — when Playnite detection identifies a game,
 
 **Wrong game folder was chosen**  
 → Move the file manually and add the correct alias to the dictionary.
+
+**Every screenshot from an emulator lands in the same game folder, regardless of which ROM is running**  
+→ The dictionary learned a `prefix → game` alias from the first ROM detected (e.g. `retroarch → Demon's Crest`) and is now reusing it for everything. Remove that alias from the dictionary (**Open dictionary**), then add the emulator's process prefix to **Emulator process prefixes** in Settings so this can't happen again.
 
 **A game has no folder yet**  
 → Create the subfolder inside the destination base, or enable **Auto-create game folders**.
