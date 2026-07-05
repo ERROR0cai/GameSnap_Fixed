@@ -139,6 +139,16 @@ You can use this together with [Emulator process prefixes](#emulator-process-pre
 
 Supported out of the box: RetroArch, PCSX2, Dolphin, RPCS3, Cemu, PPSSPP, mGBA, DuckStation. Custom emulators can be added with the **+ Add emulator** button. Each entry needs its checkbox enabled and either an auto-detected path or a custom one.
 
+**ROM internal names:** many arcade/Neo Geo ROMs save screenshots using their internal short name (`mslug`, `garou`, `kof98`...) instead of the full display title, which won't fuzzy-match your Playnite library. Add an alias to the same `dictionary.txt` you already use for PC games:
+```
+[Metal Slug X - Super Vehicle-001]
+mslug
+
+[Garou: Mark of the Wolves]
+garou
+```
+The dictionary is checked before folder/library matching, for both ShareX-captured and natively-captured emulator screenshots.
+
 ---
 
 ## Dictionary
