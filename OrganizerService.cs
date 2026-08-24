@@ -38,10 +38,7 @@ namespace GameSnapPlugin
         // ──────────────────────────────────────────────
         // Entry point — chamado pelo watcher e pelo loop
         // ──────────────────────────────────────────────
-        // Steam service reference (set by plugin)
         public SteamService? SteamService { get; set; }
-
-        // Emulator service reference (set by plugin)
         public EmulatorService? EmulatorService { get; set; }
 
         public void Organize()
@@ -68,29 +65,29 @@ namespace GameSnapPlugin
             if (!Directory.Exists(_settings.DestinationBase)) return;
 
             var folders = LoadFolders();
-            var counts  = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var matchScores = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var source in allSources)
             {
                 if (!Directory.Exists(source)) continue;
                 foreach (var file in Directory.GetFiles(source))
                 {
-                    TryOrganizeFile(file, dict, folders, counts);
+                    TryOrganizeFile(file, dict, folders, counts, matchScores);
                 }
             }
 
             if (counts.Count > 0)
             {
+                var total = counts.Values.Sum();
                 var summary = string.Join(" | ", counts.Select(kv => $"{kv.Key} ({kv.Value})"));
-                _logger.Info($"Organized: {summary}");
+                var scoreSummary = string.Join(" | ", matchScores.Select(kv => $"{kv.Key} ({kv.Value}%)"));
 
-                // Dispara notificação agregada
+                _logger.Info($"Organized: {summary}");
                 OnFileMoved?.Invoke(
                     "GameSnap",
-                    $"Organized {counts.Values.Sum()} screenshot(s): {summary}"
+                    $"Organized {total} screenshot(s): {summary}  [Score: {scoreSummary}]"
                 );
-
-                // Notifica ScreenshotsVisualizer com a lista de jogos afetados
                 OnGamesOrganized?.Invoke(counts.Keys.ToList());
             }
         }
@@ -112,7 +109,8 @@ namespace GameSnapPlugin
             if (pending.Count == 0) return;
 
             var folders = LoadFolders();
-            var counts  = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var matchScores = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var ss in pending)
             {
@@ -127,11 +125,8 @@ namespace GameSnapPlugin
                     continue;
                 }
 
-                var normGame = DictionaryService.Normalize(gameName);
-                var match = folders
-                    .Where(f => f.NameNorm.Contains(normGame) || normGame.Contains(f.NameNorm))
-                    .OrderByDescending(f => f.NameNorm.Length)
-                    .FirstOrDefault();
+                var matchResult = FindBestMatchByScore(gameName, folders, _settings.MatchThreshold);
+                var match = matchResult.Folder;
 
                 if (match == null)
                 {
@@ -141,8 +136,14 @@ namespace GameSnapPlugin
                     continue;
                 }
 
-                var ext      = Path.GetExtension(ss.FilePath).ToLowerInvariant();
-                var date     = GetBestDate(ss.FilePath);
+                // Record match score
+                if (!matchScores.ContainsKey(match.NameOriginal) || matchResult.Score > matchScores[match.NameOriginal])
+                {
+                    matchScores[match.NameOriginal] = matchResult.Score;
+                }
+
+                var ext = Path.GetExtension(ss.FilePath).ToLowerInvariant();
+                var date = GetBestDate(ss.FilePath);
                 var destName = BuildDestName(match.NameOriginal, date,
                                             Path.GetFileNameWithoutExtension(ss.FilePath), ext);
                 var destPath = Path.Combine(match.Path, destName);
@@ -168,7 +169,7 @@ namespace GameSnapPlugin
                     counts[match.NameOriginal] = current + 1;
 
                     _logger.Write(LogType.Move,
-                        $"Steam: {Path.GetFileName(ss.FilePath)} → {match.NameOriginal}");
+                        $"Steam: {Path.GetFileName(ss.FilePath)} → {match.NameOriginal} (Score: {matchResult.Score}%)");
                 }
                 catch (Exception ex)
                 {
@@ -179,8 +180,10 @@ namespace GameSnapPlugin
 
             if (counts.Count > 0)
             {
+                var total = counts.Values.Sum();
                 var summary = string.Join(" | ", counts.Select(kv => $"{kv.Key} ({kv.Value})"));
-                OnFileMoved?.Invoke("GameSnap", $"Steam: {counts.Values.Sum()} screenshot(s): {summary}");
+                var scoreSummary = string.Join(" | ", matchScores.Select(kv => $"{kv.Key} ({kv.Value}%)"));
+                OnFileMoved?.Invoke("GameSnap", $"Steam: {total} screenshot(s): {summary}  [Score: {scoreSummary}]");
             }
         }
 
@@ -195,36 +198,29 @@ namespace GameSnapPlugin
             if (pending.Count == 0) return;
 
             var folders = LoadFolders();
-            var counts  = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var matchScores = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var ss in pending)
             {
                 if (_processed.Contains(ss.FilePath)) continue;
 
-                // Consulta o dicionário primeiro — resolve nomes internos de ROM
-                // (ex: "mslug", "garou") que não batem por aproximação com o
-                // título de exibição do Playnite. Mesmo dicionário usado pelo
-                // fluxo do ShareX (WindowFallback/Playnite), sem aprendizado
-                // automático aqui (o resolvedor de emulador já é mais específico).
                 var resolvedName = ss.GameName;
                 var normCandidate = DictionaryService.Normalize(ss.GameName);
                 if (dict.TryGetValue(normCandidate, out var fromDict))
                     resolvedName = fromDict;
 
-                var normGame = DictionaryService.Normalize(resolvedName);
-                var match = folders
-                    .Where(f => f.NameNorm.Contains(normGame) || normGame.Contains(f.NameNorm))
-                    .OrderByDescending(f => f.NameNorm.Length)
-                    .FirstOrDefault();
+                var matchResult = FindBestMatchByScore(resolvedName, folders, _settings.MatchThreshold);
+                var match = matchResult.Folder;
 
                 if (match == null)
                 {
                     // Auto-create if enabled
                     if (_settings.AutoCreateFolders)
                     {
-                        var invalid    = Path.GetInvalidFileNameChars();
+                        var invalid = Path.GetInvalidFileNameChars();
                         var folderName = string.Concat(resolvedName.Split(invalid)).Trim();
-                        var newPath    = Path.Combine(_settings.DestinationBase, folderName);
+                        var newPath = Path.Combine(_settings.DestinationBase, folderName);
                         Directory.CreateDirectory(newPath);
                         folders = LoadFolders(); // refresh
                         match = folders.FirstOrDefault(f =>
@@ -240,8 +236,14 @@ namespace GameSnapPlugin
                     }
                 }
 
-                var ext      = Path.GetExtension(ss.FilePath).ToLowerInvariant();
-                var date     = GetBestDate(ss.FilePath);
+                // Record match score
+                if (!matchScores.ContainsKey(match.NameOriginal) || matchResult.Score > matchScores[match.NameOriginal])
+                {
+                    matchScores[match.NameOriginal] = matchResult.Score;
+                }
+
+                var ext = Path.GetExtension(ss.FilePath).ToLowerInvariant();
+                var date = GetBestDate(ss.FilePath);
                 var destName = BuildDestName(match.NameOriginal, date,
                                             Path.GetFileNameWithoutExtension(ss.FilePath), ext);
                 var destPath = Path.Combine(match.Path, destName);
@@ -267,7 +269,7 @@ namespace GameSnapPlugin
                     counts[match.NameOriginal] = current + 1;
 
                     _logger.Write(LogType.Move,
-                        $"Emulator [{ss.Emulator}]: {Path.GetFileName(ss.FilePath)} → {match.NameOriginal}");
+                        $"Emulator [{ss.Emulator}]: {Path.GetFileName(ss.FilePath)} → {match.NameOriginal} (Score: {matchResult.Score}%)");
                 }
                 catch (Exception ex)
                 {
@@ -277,8 +279,10 @@ namespace GameSnapPlugin
 
             if (counts.Count > 0)
             {
+                var total = counts.Values.Sum();
                 var summary = string.Join(" | ", counts.Select(kv => $"{kv.Key} ({kv.Value})"));
-                OnFileMoved?.Invoke("GameSnap", $"Emulators: {counts.Values.Sum()} screenshot(s): {summary}");
+                var scoreSummary = string.Join(" | ", matchScores.Select(kv => $"{kv.Key} ({kv.Value}%)"));
+                OnFileMoved?.Invoke("GameSnap", $"Emulators: {total} screenshot(s): {summary}  [Score: {scoreSummary}]");
             }
         }
 
@@ -289,7 +293,8 @@ namespace GameSnapPlugin
             string filePath,
             Dictionary<string, string> dict,
             List<FolderEntry> folders,
-            Dictionary<string, int> counts)
+            Dictionary<string, int> counts,
+            Dictionary<string, int> matchScores)
         {
             if (_processed.Contains(filePath)) return;
 
@@ -303,16 +308,13 @@ namespace GameSnapPlugin
             System.Threading.Thread.Sleep(800);
 
             var fileName = Path.GetFileName(filePath);
-            var prefix   = GetPrefix(fileName);
-            var normPfx  = DictionaryService.Normalize(prefix);
+            var prefix = GetPrefix(fileName);
+            var normPfx = DictionaryService.Normalize(prefix);
 
-            string? game   = null;
-            string  method = "UNKNOWN";
+            string? game = null;
+            string method = "UNKNOWN";
 
-            // 0. Bypass de emulador — prefixos como "retroarch" identificam o CORE, não a ROM.
-            // Um único prefixo serve pra vários jogos diferentes, então dicionário e janela
-            // ativa não podem ser usados (nem aprendidos) para esses prefixos: a única fonte
-            // confiável é o jogo que o Playnite diz estar rodando agora.
+            // 0. Bypass de emulador
             bool isEmulatorPrefix = _settings.EmulatorPrefixes
                 .Any(p => normPfx.Equals(DictionaryService.Normalize(p), StringComparison.OrdinalIgnoreCase));
 
@@ -320,7 +322,7 @@ namespace GameSnapPlugin
             {
                 if (!string.IsNullOrEmpty(_currentGame))
                 {
-                    game   = _currentGame;
+                    game = _currentGame;
                     method = "EMULATOR-PLAYNITE";
                 }
                 else
@@ -335,16 +337,15 @@ namespace GameSnapPlugin
             // 1. Dicionário
             if (game == null && dict.TryGetValue(normPfx, out var fromDict))
             {
-                game   = fromDict;
+                game = fromDict;
                 method = "DICTIONARY";
             }
 
             // 2. Playnite
             if (game == null && _settings.UsePlayniteDetection && !string.IsNullOrEmpty(_currentGame))
             {
-                game   = _currentGame;
+                game = _currentGame;
                 method = "PLAYNITE";
-                // Auto-learn: save prefix → game mapping so future files skip detection
                 if (!string.IsNullOrEmpty(prefix) && prefix.Length > 2)
                 {
                     _dictionary.SaveAlias(prefix, _currentGame);
@@ -352,13 +353,9 @@ namespace GameSnapPlugin
                 }
             }
 
-            // 3. Janela ativa — nunca roda para prefixos de emulador (isEmulatorPrefix já
-            // retornou acima quando não há jogo ativo, então chegar aqui com game == null
-            // e isEmulatorPrefix == true não deveria acontecer, mas o guard abaixo garante isso.
-            // Opção D: só ativa durante sessão de jogo (entre OnGameStarted e OnGameStopped)
-            // Opção C: só ativa se o prefixo já existe no dicionário (jogo conhecido fora do Playnite)
-            bool inGameSession  = _currentGame != null;
-            bool prefixKnown    = dict.ContainsKey(normPfx);
+            // 3. Janela ativa
+            bool inGameSession = _currentGame != null;
+            bool prefixKnown = dict.ContainsKey(normPfx);
             bool canUseFallback = _settings.UseWindowFallback && (inGameSession || prefixKnown);
 
             if (game == null && canUseFallback)
@@ -368,30 +365,27 @@ namespace GameSnapPlugin
                 {
                     var normWin = DictionaryService.Normalize(win);
 
-                    // Blacklist expandida — rejeita janelas que claramente não são jogos
                     bool blocked = _settings.WindowBlacklist.Any(b =>
                         normWin.IndexOf(b, StringComparison.OrdinalIgnoreCase) >= 0);
 
-                    // Rejeita títulos com padrões típicos de sistema/browser
                     bool looksLikeSystem =
                         normWin.Contains("explorador de arquivos") ||
                         normWin.Contains("file explorer") ||
-                        normWin.Contains("mais guias") ||       // "e 3 mais guias"
+                        normWin.Contains("mais guias") ||
                         normWin.Contains("more tabs") ||
                         normWin.Contains("google drive") ||
                         normWin.Contains("onedrive") ||
                         normWin.Contains("hotmail") ||
-                        normWin.Contains("playnite") ||         // "+Playnite", "Playnite", etc.
+                        normWin.Contains("playnite") ||
                         normWin.Contains("gmail") ||
                         normWin.Contains("outlook") ||
                         normWin.Contains(" - explorador") ||
                         normWin.Contains(" - explorer") ||
-                        normWin.Contains("playnite") ||         // evita pasta do Playnite
                         normWin.Length < 3;
 
                     if (!blocked && !looksLikeSystem)
                     {
-                        game   = win;
+                        game = win;
                         method = "WINDOW";
                         _logger.Write(LogType.Fallback, $"Prefix: {prefix}\nDetected: {win}");
                     }
@@ -411,18 +405,23 @@ namespace GameSnapPlugin
                 return;
             }
 
-            // Encontra pasta de destino
-            var normGame = DictionaryService.Normalize(game);
-            var match = folders
-                .Where(f => f.NameNorm.Contains(normGame) || normGame.Contains(f.NameNorm))
-                .OrderByDescending(f => f.NameNorm.Length)
-                .FirstOrDefault();
+            // Encontra pasta de destino usando similaridade
+            var matchResult = FindBestMatchByScore(game, folders, _settings.MatchThreshold);
+            var match = matchResult.Folder;
+            var matchScore = matchResult.Score;
+            var matchType = matchResult.MatchType;
 
             if (match == null)
             {
-                _logger.Write(LogType.Error, $"File: {fileName}\nGame: {game}\nNo folder found");
+                _logger.Write(LogType.Error, $"File: {fileName}\nGame: {game}\nNo folder found (score: {matchScore})");
                 TryMoveToUnmatched(filePath, ext);
                 return;
+            }
+
+            // Record match score
+            if (!matchScores.ContainsKey(match.NameOriginal) || matchResult.Score > matchScores[match.NameOriginal])
+            {
+                matchScores[match.NameOriginal] = matchResult.Score;
             }
 
             // Destino final
@@ -430,11 +429,10 @@ namespace GameSnapPlugin
                 ? EnsureDir(Path.Combine(match.Path, "Videos"))
                 : match.Path;
 
-            var date     = GetBestDate(filePath);
+            var date = GetBestDate(filePath);
             var destName = BuildDestName(match.NameOriginal, date, Path.GetFileNameWithoutExtension(fileName), ext);
             var destPath = Path.Combine(destDir, destName);
 
-            // Evita colisão
             int i = 1;
             while (File.Exists(destPath))
             {
@@ -447,7 +445,6 @@ namespace GameSnapPlugin
             {
                 File.Move(filePath, destPath);
 
-                // Backup opcional
                 if (_settings.EnableBackup && !string.IsNullOrEmpty(_settings.BackupFolder))
                     TryBackup(destPath, match.NameOriginal, isVideo);
 
@@ -456,7 +453,7 @@ namespace GameSnapPlugin
                 int current = counts.ContainsKey(match.NameOriginal) ? counts[match.NameOriginal] : 0;
                 counts[match.NameOriginal] = current + 1;
 
-                _logger.Write(LogType.Move, $"File: {fileName}\nGame: {game}\nMethod: {method}");
+                _logger.Write(LogType.Move, $"File: {fileName}\nGame: {game}\nMethod: {method}\nScore: {matchScore}% ({matchType})");
             }
             catch (Exception ex)
             {
@@ -504,8 +501,8 @@ namespace GameSnapPlugin
             try
             {
                 var backupGame = EnsureDir(Path.Combine(_settings.BackupFolder, gameName));
-                var backupDir  = isVideo ? EnsureDir(Path.Combine(backupGame, "Videos")) : backupGame;
-                var destPath   = Path.Combine(backupDir, Path.GetFileName(sourcePath));
+                var backupDir = isVideo ? EnsureDir(Path.Combine(backupGame, "Videos")) : backupGame;
+                var destPath = Path.Combine(backupDir, Path.GetFileName(sourcePath));
 
                 if (!File.Exists(destPath))
                     File.Copy(sourcePath, destPath);
@@ -526,9 +523,9 @@ namespace GameSnapPlugin
                 : _settings.RenamePattern;
 
             var result = pattern
-                .Replace("{game}",     SanitizeFileName(gameName))
-                .Replace("{date}",     date.ToString("yyyy-MM-dd"))
-                .Replace("{time}",     date.ToString("HH_mm_ss"))
+                .Replace("{game}", SanitizeFileName(gameName))
+                .Replace("{date}", date.ToString("yyyy-MM-dd"))
+                .Replace("{time}", date.ToString("HH_mm_ss"))
                 .Replace("{datetime}", date.ToString("yyyy-MM-dd_HH_mm_ss"))
                 .Replace("{original}", SanitizeFileName(originalName));
 
@@ -551,8 +548,8 @@ namespace GameSnapPlugin
                 .Select(d => new FolderEntry
                 {
                     NameOriginal = Path.GetFileName(d),
-                    NameNorm     = DictionaryService.Normalize(Path.GetFileName(d)),
-                    Path         = d
+                    NameNorm = DictionaryService.Normalize(Path.GetFileName(d)),
+                    Path = d
                 })
                 .ToList();
         }
@@ -608,11 +605,140 @@ namespace GameSnapPlugin
             return sb.ToString();
         }
 
+        // ──────────────────────────────────────────────
+        // Inner classes
+        // ──────────────────────────────────────────────
+
         private class FolderEntry
         {
             public string NameOriginal { get; set; } = "";
-            public string NameNorm     { get; set; } = "";
-            public string Path         { get; set; } = "";
+            public string NameNorm { get; set; } = "";
+            public string Path { get; set; } = "";
+        }
+
+        private class MatchResult
+        {
+            public FolderEntry? Folder { get; set; }
+            public int Score { get; set; }
+            public string MatchType { get; set; } = "none";
+            public bool IsMatch => Folder != null && Score > 0;
+        }
+
+        // ──────────────────────────────────────────────
+        // Similarity score matching
+        // ──────────────────────────────────────────────
+
+        private MatchResult FindBestMatchByScore(string gameName, List<FolderEntry> folders, int minScore = 50)
+        {
+            if (string.IsNullOrEmpty(gameName) || folders.Count == 0)
+                return new MatchResult { Score = 0, MatchType = "none" };
+
+            var normGame = DictionaryService.Normalize(gameName);
+            var candidates = new List<(FolderEntry Folder, int Score, string MatchType)>();
+
+            foreach (var folder in folders)
+            {
+                int score = 0;
+                string matchType = "none";
+                var normFolder = folder.NameNorm;
+
+                // ─── 1. Exact match (100 points) ───
+                if (string.Equals(normFolder, normGame, StringComparison.OrdinalIgnoreCase))
+                {
+                    score = 100;
+                    matchType = "exact";
+                    candidates.Add((folder, score, matchType));
+                    continue;
+                }
+
+                // ─── 2. Containment match ───
+                if (normFolder.Contains(normGame))
+                {
+                    var ratio = (double)normGame.Length / normFolder.Length;
+                    score = 60 + (int)(ratio * 20);
+                    matchType = "folder_contains_game";
+                }
+                else if (normGame.Contains(normFolder))
+                {
+                    var ratio = (double)normFolder.Length / normGame.Length;
+                    score = 50 + (int)(ratio * 30);
+                    matchType = "game_contains_folder";
+                }
+
+                // ─── 3. Word match ───
+                var gameWords = normGame.Split(new[] { ' ', '-', '_', '.' }, StringSplitOptions.RemoveEmptyEntries);
+                var folderWords = normFolder.Split(new[] { ' ', '-', '_', '.' }, StringSplitOptions.RemoveEmptyEntries);
+
+                if (gameWords.Length > 0 && folderWords.Length > 0)
+                {
+                    var commonWords = gameWords.Intersect(folderWords, StringComparer.OrdinalIgnoreCase).ToList();
+                    var commonCount = commonWords.Count;
+
+                    if (commonCount > 0)
+                    {
+                        var maxWords = Math.Max(gameWords.Length, folderWords.Length);
+                        var wordScore = (int)((double)commonCount / maxWords * 40);
+
+                        if (score > 0)
+                        {
+                            score = Math.Min(score + wordScore / 2, 95);
+                        }
+                        else
+                        {
+                            score = 30 + wordScore;
+                            matchType = "word_match";
+                        }
+                    }
+                }
+
+                // ─── 4. Prefix match ───
+                if (normGame.StartsWith(normFolder, StringComparison.OrdinalIgnoreCase) ||
+                    normFolder.StartsWith(normGame, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (score < 70) score = 70;
+                    matchType = "prefix_match";
+                }
+
+                if (score > 0)
+                {
+                    candidates.Add((folder, score, matchType));
+                }
+            }
+
+            // ─── 5. Sort by score descending ───
+            var best = candidates
+                .OrderByDescending(c => c.Score)
+                .FirstOrDefault();
+
+            if (best.Folder == null || best.Score < minScore)
+            {
+                _logger.Write(LogType.Info,
+                    best.Folder == null
+                        ? $"No match found for '{gameName}'"
+                        : $"Match score {best.Score} below threshold {minScore} for '{gameName}' → no match");
+                return new MatchResult { Score = best.Score, MatchType = best.MatchType };
+            }
+
+            _logger.Write(LogType.Info,
+                $"Best match for '{gameName}': '{best.Folder.NameOriginal}' (score: {best.Score}, type: {best.MatchType})");
+
+            // Check for candidates with close scores (difference <= 5)
+            var closeCandidates = candidates
+                .Where(c => c.Score >= best.Score - 5 && c.Folder != best.Folder)
+                .ToList();
+            if (closeCandidates.Any())
+            {
+                var others = string.Join(", ", closeCandidates.Select(c => $"{c.Folder.NameOriginal}({c.Score})"));
+                _logger.Write(LogType.Info,
+                    $"⚠️ Multiple close matches for '{gameName}': {others}. Selected: {best.Folder.NameOriginal}");
+            }
+
+            return new MatchResult
+            {
+                Folder = best.Folder,
+                Score = best.Score,
+                MatchType = best.MatchType
+            };
         }
     }
 }
