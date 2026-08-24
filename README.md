@@ -1,5 +1,3 @@
-Based on the original [GameSnap](https://github.com/TokamiGankei/GameSnap) by TokamiGankei, this fixed version improves matching accuracy, adds a scoring algorithm, an adjustable threshold slider, and full Chinese localization.
-
 # GameSnap
 
 A [Playnite](https://playnite.link/) plugin that **automatically organizes your game screenshots** into per-game folders — works with Xbox Game Bar, ShareX, and any other capture tool.
