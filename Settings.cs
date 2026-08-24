@@ -86,6 +86,11 @@ namespace GameSnapPlugin
         // do arquivo é sempre o mesmo independente da ROM rodando.
         private List<string> _emulatorPrefixes = new List<string>();
         public List<string> EmulatorPrefixes { get => _emulatorPrefixes; set => SetValue(ref _emulatorPrefixes, value); }
+
+        // ─── New: Match similarity threshold ───
+        // Files below this score will not be matched (0-100), default 50
+        private int _matchThreshold = 50;
+        public int MatchThreshold { get => _matchThreshold; set => SetValue(ref _matchThreshold, value); }
     }
 
     public class GameSnapSettingsViewModel : ObservableObject, ISettings
