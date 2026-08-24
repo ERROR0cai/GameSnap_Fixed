@@ -190,7 +190,7 @@ namespace GameSnapPlugin
         {
             yield return new GameMenuItem
             {
-                Description = "Organize screenshots now",
+                Description = PlayniteApi.Resources.GetString("LOCGameSnapOrganizeScreenshots"),
                 MenuSection = "GameSnap",
                 Action = _ => _organizer?.Organize()
             };
@@ -198,15 +198,17 @@ namespace GameSnapPlugin
 
         public override IEnumerable<MainMenuItem> GetMainMenuItems(GetMainMenuItemsArgs args)
         {
+            var loc = PlayniteApi.Resources;
+
             yield return new MainMenuItem
             {
-                Description = "Organize screenshots now",
+                Description = loc.GetString("LOCGameSnapOrganizeScreenshots"),
                 MenuSection = "@GameSnap",
                 Action = _ => _organizer?.Organize()
             };
             yield return new MainMenuItem
             {
-                Description = "Open log",
+                Description = loc.GetString("LOCGameSnapOpenLog"),
                 MenuSection = "@GameSnap",
                 Action = _ =>
                 {
@@ -218,7 +220,7 @@ namespace GameSnapPlugin
             };
             yield return new MainMenuItem
             {
-                Description = "Open dictionary",
+                Description = loc.GetString("LOCGameSnapOpenDictionary"),
                 MenuSection = "@GameSnap",
                 Action = _ =>
                 {
@@ -231,13 +233,13 @@ namespace GameSnapPlugin
             };
             yield return new MainMenuItem
             {
-                Description = "Review unmatched screenshots",
+                Description = loc.GetString("LOCGameSnapReviewUnmatched"),
                 MenuSection = "@GameSnap",
                 Action = _ => OpenReviewWindow()
             };
             yield return new MainMenuItem
             {
-                Description = "Review unmatched screenshots (Fullscreen / Gamepad)",
+                Description = loc.GetString("LOCGameSnapReviewUnmatchedFullscreen"),
                 MenuSection = "@GameSnap",
                 Action = _ => OpenFullscreenReviewWindow()
             };
