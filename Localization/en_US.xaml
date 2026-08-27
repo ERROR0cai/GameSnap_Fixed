@@ -79,11 +79,11 @@
 
     <!-- ScreenshotsVisualizer -->
     <sys:String x:Key="LOCGameSnap_SVIntegration">ScreenshotsVisualizer Integration</sys:String>
-    <sys:String x:Key="LOCGameSnap_EnableSVRefresh">Auto-refresh ScreenshotsVisualizer after organizing (disabled by default)</sys:String>
+    <sys:String x:Key="LOCGameSnap_EnableSVRefresh">Auto-refresh ScreenshotsVisualizer after organizing (default: refresh after closing the game; when enabled, refreshes after every screenshot)</sys:String>
 
     <!-- ToolTips - ScreenshotsVisualizer -->
     <sys:String x:Key="LOCGameSnap_Tip_EnableSVRefresh">When enabled, GameSnap automatically notifies ScreenshotsVisualizer to rescan a game whenever a screenshot is moved to its folder. Screenshots appear in the viewer instantly without any manual refresh. Requires ScreenshotsVisualizer to be installed — has no effect otherwise.</sys:String>
-    <sys:String x:Key="LOCGameSnap_Tip_EnableSVRefreshLabel">Pairs with ScreenshotsVisualizer by Lacro59. Set the Global screenshots path in SV to your destination folder with the {Name} token.</sys:String>
+    <sys:String x:Key="LOCGameSnap_Tip_EnableSVRefreshLabel">Pairs with ScreenshotsVisualizer by Lacro59. Set the Global screenshots path in ScreenshotsVisualizer to your destination folder with the {Name} token.</sys:String>
 
     <!-- Steam -->
     <sys:String x:Key="LOCGameSnap_Steam">Steam Screenshots</sys:String>

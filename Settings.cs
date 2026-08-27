@@ -46,6 +46,14 @@ namespace GameSnapPlugin
         private string _renamePattern = "{game}_{date}_{time}";
         public string RenamePattern { get => _renamePattern; set => SetValue(ref _renamePattern, value); }
 
+        // 新增
+        private string _customSuffix = "";
+        public string CustomSuffix
+        {
+            get => _customSuffix;
+            set => SetValue(ref _customSuffix, value);
+        }
+
         private bool _enableBackup = false;
         public bool EnableBackup { get => _enableBackup; set => SetValue(ref _enableBackup, value); }
 

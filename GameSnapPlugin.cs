@@ -87,22 +87,24 @@ namespace GameSnapPlugin
             {
                 var sv = PlayniteApi.Addons.Plugins
                     .FirstOrDefault(p => p.Id == ScreenshotsVisualizerId);
-                if (sv == null) return;
+                if (sv == null)
+                {
+                    _logger?.Info("ScreenshotsVisualizer plugin not found");
+                    return;
+                }
 
-                // Acessa Database.RefreshData(Game) via reflexão
-                var dbProp = sv.GetType().GetProperty("Database",
+                // 直接调用 SV 的 RefreshGame 方法
+                var method = sv.GetType().GetMethod("RefreshGame",
                     BindingFlags.Public | BindingFlags.Instance);
-                if (dbProp == null) return;
-
-                var db = dbProp.GetValue(sv);
-                if (db == null) return;
-
-                var refreshMethod = db.GetType().GetMethod("RefreshData",
-                    BindingFlags.Public | BindingFlags.Instance,
-                    null, new[] { typeof(Game) }, null);
-
-                refreshMethod?.Invoke(db, new object[] { game });
-                _logger?.Info($"ScreenshotsVisualizer refreshed for: {game.Name}");
+                if (method != null)
+                {
+                    method.Invoke(sv, new object[] { game });
+                    _logger?.Info($"ScreenshotsVisualizer refreshed for: {game.Name}");
+                }
+                else
+                {
+                    _logger?.Info("RefreshGame method not found in SV");
+                }
             }
             catch (Exception ex)
             {
