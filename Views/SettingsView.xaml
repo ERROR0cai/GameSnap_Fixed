@@ -102,40 +102,37 @@
             <TextBlock Style="{StaticResource TipLabel}"
                        Text="{DynamicResource LOCGameSnap_Tip_EmulatorPrefixes}"/>
 
-            <!-- 相似度阈值滑块 -->
-            <StackPanel Margin="0,8,0,8">
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                    <TextBlock Text="{DynamicResource LOCGameSnap_MatchThreshold}"
-                            VerticalAlignment="Center"
-                            Margin="0,0,12,0"/>
-                    <Slider Width="180"
-                            Minimum="0"
-                            Maximum="100"
-                            Value="{Binding Settings.MatchThreshold}"
-                            TickFrequency="5"
-                            IsSnapToTickEnabled="True"
-                            VerticalAlignment="Center"
-                            ToolTip="{DynamicResource LOCGameSnap_Tip_MatchThreshold}"/>
-                    <TextBlock Text="{Binding Settings.MatchThreshold}"
-                            Width="30"
-                            VerticalAlignment="Center"
-                            Margin="8,0,0,0"
-                            FontWeight="SemiBold"/>
-                    <TextBlock Text="%"
-                            VerticalAlignment="Center"
-                            Margin="2,0,0,0"
-                            Foreground="Gray"/>
-                </StackPanel>
-                <TextBlock Style="{StaticResource TipLabel}"
-                        Text="{DynamicResource LOCGameSnap_Tip_MatchThreshold}"/>
-            </StackPanel>
-
-            <CheckBox Content="{DynamicResource LOCGameSnap_AutoCreateFolders}"
-                      IsChecked="{Binding Settings.AutoCreateFolders}"
-                      Margin="0,0,0,4"
-                      ToolTip="{DynamicResource LOCGameSnap_Tip_AutoCreateFolders}"/>
+            <!-- ✅ 新增：黑名单前缀 -->
+            <TextBlock Text="{DynamicResource LOCGameSnap_BlacklistPrefixes}" Margin="0,8,0,4"/>
+            <TextBox Text="{Binding BlacklistPrefixesText, UpdateSourceTrigger=PropertyChanged}"/>
             <TextBlock Style="{StaticResource TipLabel}"
-                       Text="{DynamicResource LOCGameSnap_Tip_AutoCreateFoldersLabel}"/>
+                    Text="{DynamicResource LOCGameSnap_Tip_BlacklistPrefixes}"/>
+
+            <CheckBox Content="{DynamicResource LOCGameSnap_ForceCreateFolder}"
+                    IsChecked="{Binding Settings.ForceCreateFolder}"
+                    Margin="0,0,0,4"
+                    ToolTip="{DynamicResource LOCGameSnap_Tip_ForceCreateFolder}"/>
+            <TextBlock Style="{StaticResource TipLabel}"
+                    Text="{DynamicResource LOCGameSnap_Tip_ForceCreateFolderLabel}"/>
+
+            <!-- ✅ 新增：强制创建文件夹的子选项 -->
+            <CheckBox Content="{DynamicResource LOCGameSnap_ForceCreateOnGameStart}"
+                    IsChecked="{Binding Settings.ForceCreateOnGameStart}"
+                    Margin="20,2,0,4"
+                    IsEnabled="{Binding Settings.ForceCreateFolder}"
+                    ToolTip="{DynamicResource LOCGameSnap_Tip_ForceCreateOnGameStart}"/>
+            <TextBlock Style="{StaticResource TipLabel}"
+                    Margin="20,0,0,4"
+                    Text="{DynamicResource LOCGameSnap_Tip_ForceCreateOnGameStartLabel}"/>
+
+            <CheckBox Content="{DynamicResource LOCGameSnap_ForceCreateOnScreenshot}"
+                    IsChecked="{Binding Settings.ForceCreateOnScreenshot}"
+                    Margin="20,2,0,4"
+                    IsEnabled="{Binding Settings.ForceCreateFolder}"
+                    ToolTip="{DynamicResource LOCGameSnap_Tip_ForceCreateOnScreenshot}"/>
+            <TextBlock Style="{StaticResource TipLabel}"
+                    Margin="20,0,0,10"
+                    Text="{DynamicResource LOCGameSnap_Tip_ForceCreateOnScreenshotLabel}"/>
 
             <Separator Margin="0,4,0,12"/>
 
@@ -163,11 +160,48 @@
             <TextBlock Text="{DynamicResource LOCGameSnap_Notifications}" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
 
             <CheckBox Content="{DynamicResource LOCGameSnap_ShowNotifications}"
-                      IsChecked="{Binding Settings.ShowNotifications}"
-                      Margin="0,0,0,4"
-                      ToolTip="{DynamicResource LOCGameSnap_Tip_ShowNotifications}"/>
+                    IsChecked="{Binding Settings.ShowNotifications}"
+                    Margin="0,0,0,4"
+                    ToolTip="{DynamicResource LOCGameSnap_Tip_ShowNotifications}"/>
             <TextBlock Style="{StaticResource TipLabel}"
-                       Text="{DynamicResource LOCGameSnap_Tip_ShowNotificationsLabel}"/>
+                    Text="{DynamicResource LOCGameSnap_Tip_ShowNotificationsLabel}"/>
+
+            <!-- ✅ 新增：通知时机子选项 -->
+            <CheckBox Content="{DynamicResource LOCGameSnap_NotifyOnEachScreenshot}"
+                    IsChecked="{Binding Settings.NotifyOnEachScreenshot}"
+                    Margin="20,2,0,4"
+                    IsEnabled="{Binding Settings.ShowNotifications}"
+                    ToolTip="{DynamicResource LOCGameSnap_Tip_NotifyOnEachScreenshot}"/>
+            <TextBlock Style="{StaticResource TipLabel}"
+                    Margin="20,0,0,2"
+                    Text="{DynamicResource LOCGameSnap_Tip_NotifyOnEachScreenshotLabel}"/>
+
+            <CheckBox Content="{DynamicResource LOCGameSnap_NotifyOnGameEnd}"
+                    IsChecked="{Binding Settings.NotifyOnGameEnd}"
+                    Margin="20,2,0,4"
+                    IsEnabled="{Binding Settings.ShowNotifications}"
+                    ToolTip="{DynamicResource LOCGameSnap_Tip_NotifyOnGameEnd}"/>
+            <TextBlock Style="{StaticResource TipLabel}"
+                    Margin="20,0,0,10"
+                    Text="{DynamicResource LOCGameSnap_Tip_NotifyOnGameEndLabel}"/>
+
+            <!-- 图片分类异常通知 -->
+            <CheckBox Content="{DynamicResource LOCGameSnap_EnableMismatchNotification}"
+                    IsChecked="{Binding Settings.EnableMismatchNotification}"
+                    Margin="0,8,0,4"
+                    ToolTip="{DynamicResource LOCGameSnap_Tip_EnableMismatchNotification}"/>
+            <TextBlock Style="{StaticResource TipLabel}"
+                    Text="{DynamicResource LOCGameSnap_Tip_EnableMismatchNotificationLabel}"/>
+
+            <!-- 限制通知（子选项，缩进显示） -->
+            <CheckBox Content="{DynamicResource LOCGameSnap_LimitNotifications}"
+                    IsChecked="{Binding Settings.LimitNotifications}"
+                    Margin="20,2,0,4"
+                    IsEnabled="{Binding Settings.EnableMismatchNotification}"
+                    ToolTip="{DynamicResource LOCGameSnap_Tip_LimitNotifications}"/>
+            <TextBlock Style="{StaticResource TipLabel}"
+                    Margin="20,0,0,10"
+                    Text="{DynamicResource LOCGameSnap_Tip_LimitNotificationsLabel}"/>
 
             <Separator Margin="0,4,0,12"/>
 

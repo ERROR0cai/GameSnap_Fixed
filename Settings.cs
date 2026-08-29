@@ -31,8 +31,8 @@ namespace GameSnapPlugin
         private bool _useWindowFallback = true;
         public bool UseWindowFallback { get => _useWindowFallback; set => SetValue(ref _useWindowFallback, value); }
 
-        private bool _autoCreateFolders = false;
-        public bool AutoCreateFolders { get => _autoCreateFolders; set => SetValue(ref _autoCreateFolders, value); }
+        // private bool _autoCreateFolders = false;
+        // public bool AutoCreateFolders { get => _autoCreateFolders; set => SetValue(ref _autoCreateFolders, value); }
 
         private bool _moveUnmatchedToFolder = false;
         public bool MoveUnmatchedToFolder { get => _moveUnmatchedToFolder; set => SetValue(ref _moveUnmatchedToFolder, value); }
@@ -42,6 +42,21 @@ namespace GameSnapPlugin
 
         private bool _showNotifications = true;
         public bool ShowNotifications { get => _showNotifications; set => SetValue(ref _showNotifications, value); }
+
+        // ✅ 新增：通知时机子选项
+        private bool _notifyOnEachScreenshot = true;
+        public bool NotifyOnEachScreenshot
+        {
+            get => _notifyOnEachScreenshot;
+            set => SetValue(ref _notifyOnEachScreenshot, value);
+        }
+
+        private bool _notifyOnGameEnd = true;
+        public bool NotifyOnGameEnd
+        {
+            get => _notifyOnGameEnd;
+            set => SetValue(ref _notifyOnGameEnd, value);
+        }
 
         private string _renamePattern = "{game}_{date}_{time}";
         public string RenamePattern { get => _renamePattern; set => SetValue(ref _renamePattern, value); }
@@ -95,10 +110,52 @@ namespace GameSnapPlugin
         private List<string> _emulatorPrefixes = new List<string>();
         public List<string> EmulatorPrefixes { get => _emulatorPrefixes; set => SetValue(ref _emulatorPrefixes, value); }
 
+        // ✅ 新增：黑名单前缀 - 匹配后直接跳过所有处理
+        private List<string> _blacklistPrefixes = new List<string>();
+        public List<string> BlacklistPrefixes { get => _blacklistPrefixes; set => SetValue(ref _blacklistPrefixes, value); }
+
         // ─── New: Match similarity threshold ───
         // Files below this score will not be matched (0-100), default 50
-        private int _matchThreshold = 50;
-        public int MatchThreshold { get => _matchThreshold; set => SetValue(ref _matchThreshold, value); }
+        // private int _matchThreshold = 70;
+        // public int MatchThreshold { get => _matchThreshold; set => SetValue(ref _matchThreshold, value); }
+
+        // ─── New: Force create folder ───
+        private bool _forceCreateFolder = true;
+        public bool ForceCreateFolder
+        {
+            get => _forceCreateFolder;
+            set => SetValue(ref _forceCreateFolder, value);
+        }
+
+        // ✅ 新增：强制创建文件夹的子选项
+        private bool _forceCreateOnGameStart = false;
+        public bool ForceCreateOnGameStart
+        {
+            get => _forceCreateOnGameStart;
+            set => SetValue(ref _forceCreateOnGameStart, value);
+        }
+
+        private bool _forceCreateOnScreenshot = true;
+        public bool ForceCreateOnScreenshot
+        {
+            get => _forceCreateOnScreenshot;
+            set => SetValue(ref _forceCreateOnScreenshot, value);
+        }
+
+        // ─── Notification settings ───
+        private bool _enableMismatchNotification = true;
+        public bool EnableMismatchNotification
+        {
+            get => _enableMismatchNotification;
+            set => SetValue(ref _enableMismatchNotification, value);
+        }
+
+        private bool _limitNotifications = true;
+        public bool LimitNotifications
+        {
+            get => _limitNotifications;
+            set => SetValue(ref _limitNotifications, value);
+        }
     }
 
     public class GameSnapSettingsViewModel : ObservableObject, ISettings
@@ -152,6 +209,10 @@ namespace GameSnapPlugin
                     "retroarch", "pcsx2", "dolphin", "rpcs3",
                     "cemu", "ppsspp", "mgba", "duckstation"
                 };
+
+            // ✅ 新增：黑名单前缀默认值
+            if (Settings.BlacklistPrefixes.Count == 0)
+                Settings.BlacklistPrefixes = new List<string>();
 
             // Emulator profiles: usa salvos ou cria defaults
             if (Settings.EmulatorProfiles.Count == 0)
@@ -244,6 +305,22 @@ namespace GameSnapPlugin
             }
         }
 
+        // ✅ 新增：黑名单文本绑定
+        [DontSerialize]
+        public string BlacklistPrefixesText
+        {
+            get => string.Join(", ", Settings.BlacklistPrefixes);
+            set
+            {
+                Settings.BlacklistPrefixes = value
+                    .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim().ToLowerInvariant())
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .ToList();
+                OnPropertyChanged();
+            }
+        }
+
         [DontSerialize]
         public string AdditionalSourcesText
         {
@@ -259,11 +336,11 @@ namespace GameSnapPlugin
             }
         }
 
-        [DontSerialize]
-        public System.Windows.Visibility AutoCreateFoldersWarningVisibility
-            => Settings.AutoCreateFolders
-               ? System.Windows.Visibility.Collapsed
-               : System.Windows.Visibility.Visible;
+        // [DontSerialize]
+        // public System.Windows.Visibility AutoCreateFoldersWarningVisibility
+        //     => Settings.AutoCreateFolders
+        //        ? System.Windows.Visibility.Collapsed
+        //        : System.Windows.Visibility.Visible;
 
         // Commands
         public RelayCommand<object> BrowseSourceCommand => new RelayCommand<object>((a) =>
@@ -303,7 +380,9 @@ namespace GameSnapPlugin
             if (File.Exists(path))
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("notepad.exe", path) { UseShellExecute = true });
             else
-                _plugin.PlayniteApi.Dialogs.ShowMessage("No log file yet.", "GameSnap");
+                _plugin.PlayniteApi.Dialogs.ShowMessage(
+                    _plugin.PlayniteApi.Resources.GetString("LOCGameSnap_NoLogFile") ?? "No log file yet.",
+                    "GameSnap");
         });
 
         public RelayCommand<object> AddEmulatorCommand => new RelayCommand<object>((a) =>
