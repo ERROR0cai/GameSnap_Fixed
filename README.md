@@ -13,8 +13,7 @@
 
 ### 修复
 - 修复修改设置后当前游戏状态丢失的问题
-- 修复关闭普通通知后异常通知也被屏蔽的问题
-- 调用 [screenshotsvisualizer_Fixed](https://github.com/ERROR0cai/screenshotsvisualizer_Fixed) 的 API 进行刷新
+- 修复调用 screenshotsvisualizer API 进行刷新却无效的问题
 
 
 <img width="611" height="996" alt="image" src="https://github.com/user-attachments/assets/505898b7-c9d1-4ded-84f0-a6e43f2dd157" />
