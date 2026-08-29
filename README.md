@@ -1,6 +1,21 @@
-Based on the original [GameSnap](https://github.com/TokamiGankei/GameSnap) project developed by TokamiGankei, this fix improves matching accuracy, adds a scoring algorithm, an adjustable threshold slider, and completes full Chinese localization. It also adjusts the API call method with [screenshotsvisualizer_Fixed](https://github.com/ERROR0cai/screenshotsvisualizer_Fixed).
+基于 TokamiGankei 开发的 [GameSnap](https://github.com/TokamiGankei/GameSnap) 原版项目，此修复程序提高了匹配准确率，增加了评分算法，增加了黑名单机制，细分文件夹创建选项，增加截图完成后的通知，增加异常通知，并完成了完整的中文本地化。此外，它还调整了使用 [screenshotsvisualizer_Fixed](https://github.com/ERROR0cai/screenshotsvisualizer_Fixed) 的 API 调用方法。
 
-<img width="1996" height="1440" alt="image" src="https://github.com/user-attachments/assets/5a59c89c-dcc0-416a-9a52-8268853f7535" />
-<img width="391" height="85" alt="image" src="https://github.com/user-attachments/assets/76da368c-fbfe-4a67-b9a2-97ca4dfa392e" />
-<img width="171" height="95" alt="image" src="https://github.com/user-attachments/assets/b664a41b-ede9-4a15-a43e-d4c2b34be377" />
+### 新增功能
+- 新增黑名单前缀机制，匹配的文件将被完全忽略
+- 细分文件夹创建选项，可分别控制「游戏启动时创建」和「截图需要时创建」
+- 新增截图整理后的通知选项，支持「每次截图整理后」和「游戏结束后」两种通知时机
+- 新增图片分类异常通知，当游戏名与目标文件夹不匹配或移动失败时显示警告
 
+### 优化改进
+- 完善中文本地化支持，所有界面及通知信息均已汉化
+- 优化通知逻辑，异常通知与普通通知独立控制，互不干扰
+- 改进相似度分数显示，明确展示游戏名与文件夹的匹配关系
+
+### 修复
+- 修复修改设置后当前游戏状态丢失的问题
+- 修复关闭普通通知后异常通知也被屏蔽的问题
+- 调用 [screenshotsvisualizer_Fixed](https://github.com/ERROR0cai/screenshotsvisualizer_Fixed) 的 API 进行刷新
+
+
+<img width="611" height="996" alt="image" src="https://github.com/user-attachments/assets/505898b7-c9d1-4ded-84f0-a6e43f2dd157" />
+<img width="383" height="219" alt="image" src="https://github.com/user-attachments/assets/3b0df3e7-5f29-4e6a-8209-e52ccfd17426" />
